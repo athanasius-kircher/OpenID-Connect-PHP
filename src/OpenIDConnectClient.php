@@ -34,19 +34,6 @@ if (!isset($_SESSION)) {
 }
 
 /**
- *
- * JWT signature verification support by Jonathan Reed <jdreed@mit.edu>
- * Licensed under the same license as the rest of this file.
- *
- * phpseclib is required to validate the signatures of some tokens.
- * It can be downloaded from: http://phpseclib.sourceforge.net/
- */
-
-if (!class_exists('\phpseclib\Crypt\RSA') && !class_exists('Crypt_RSA')) {
-    user_error('Unable to find phpseclib Crypt/RSA.php.  Ensure phpseclib is installed and in include_path before you include this file');
-}
-
-/**
  * A wrapper around base64_decode which decodes Base64URL-encoded data,
  * which is not the same alphabet as base64.
  */

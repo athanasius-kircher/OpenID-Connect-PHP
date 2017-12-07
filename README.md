@@ -48,10 +48,16 @@ $name = $oidc->requestUserInfo('given_name');
 
 ```php
 use Jumbojett\OpenIDConnectClient;
-
+$request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
+    $_SERVER,
+    $_GET,
+    $_POST,
+    $_COOKIE,
+    $_FILES
+);
 $oidc = new OpenIDConnectClient("https://id.provider.com");
 
-$oidc->register();
+$oidc->register($request);
 $client_id = $oidc->getClientID();
 $client_secret = $oidc->getClientSecret();
 

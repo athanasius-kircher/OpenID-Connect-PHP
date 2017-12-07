@@ -24,6 +24,7 @@
 namespace Jumbojett;
 
 
+use Jumbojett\Exception\OpenIDConnectClientException;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
@@ -31,15 +32,6 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 if (!isset($_SESSION)) {
     @session_start();
-}
-
-
-/**
- * OpenIDConnect Exception Class
- */
-class OpenIDConnectClientException extends \Exception
-{
-
 }
 
 /**

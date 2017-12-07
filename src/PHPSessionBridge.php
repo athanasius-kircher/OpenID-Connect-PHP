@@ -8,7 +8,10 @@
 
 namespace Jumbojett;
 
-
+/**
+ * Class PHPSessionBridge simple session implementation
+ * @package Jumbojett
+ */
 class PHPSessionBridge implements SessionInterface
 {
     public function get($key, $default = null)

@@ -43,16 +43,6 @@ class OpenIDConnectClientException extends \Exception
 }
 
 /**
- * Require the CURL and JSON PHP extentions to be installed
- */
-if (!function_exists('curl_init')) {
-    throw new OpenIDConnectClientException('OpenIDConnect needs the CURL PHP extension.');
-}
-if (!function_exists('json_decode')) {
-    throw new OpenIDConnectClientException('OpenIDConnect needs the JSON PHP extension.');
-}
-
-/**
  *
  * Please note this class stores nonces by default in $_SESSION['openid_connect_nonce']
  *

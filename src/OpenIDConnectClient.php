@@ -23,6 +23,9 @@
 
 namespace Jumbojett;
 
+
+use Psr\Http\Message\ServerRequestInterface;
+
 /**
  * Use session to manage a nonce
  */
@@ -217,21 +220,22 @@ class OpenIDConnectClient
     }
 
     /**
+     * @param ServerRequestInterface $request
      * @return bool
      * @throws OpenIDConnectClientException
      */
-    public function authenticate() {
+    public function authenticate(ServerRequestInterface $request) {
 
         // Do a preemptive check to see if the provider has thrown an error from a previous redirect
-        if (isset($_REQUEST['error'])) {
-            $desc = isset($_REQUEST['error_description']) ? " Description: " . $_REQUEST['error_description'] : "";
-            throw new OpenIDConnectClientException("Error: " . $_REQUEST['error'] .$desc);
+        if ($error = Utilities::getParameterFromRequest($request,'error',false)) {
+            $desc = Utilities::getParameterFromRequest($request,'error_description','');
+            $desc = $desc !== '' ? " Description: " . $desc : "";
+            throw new OpenIDConnectClientException("Error: " . $error .$desc);
         }
 
         // If we have an authorization code then proceed to request a token
-        if (isset($_REQUEST["code"])) {
+        if ($code = Utilities::getParameterFromRequest($request,'code',false)) {
 
-            $code = $_REQUEST["code"];
             $token_json = $this->requestTokens($code);
 
             // Throw an error if the server returns one
@@ -243,12 +247,12 @@ class OpenIDConnectClient
             }
 
             // Do an OpenID Connect session check
-            if ($_REQUEST['state'] != $this->getState()) {
+            if (Utilities::getParameterFromRequest($request,'state',false) !== $this->getState()) {
                 throw new OpenIDConnectClientException("Unable to determine state");
             }
 
-	    // Cleanup state
-	    $this->unsetState();
+			// Cleanup state
+			$this->unsetState();
 
             if (!property_exists($token_json, 'id_token')) {
                 throw new OpenIDConnectClientException("User did not authorize openid scope.");
@@ -258,7 +262,7 @@ class OpenIDConnectClient
 
             // Verify the signature
             if ($this->canVerifySignatures()) {
-		if (!$this->getProviderConfigValue('jwks_uri')) {
+		        if (!$this->getProviderConfigValue('jwks_uri')) {
                     throw new OpenIDConnectClientException ("Unable to verify signature due to no jwks_uri being defined");
                 }
                 if (!$this->verifyJWTsignature($token_json->id_token)) {
@@ -274,7 +278,7 @@ class OpenIDConnectClient
                 // Clean up the session a little
                 $this->unsetNonce();
 
-		// Save the full response
+		        // Save the full response
                 $this->tokenResponse = $token_json;
 
                 // Save the id token

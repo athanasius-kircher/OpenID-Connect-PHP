@@ -25,11 +25,20 @@ require "../../autoload.php";
 
 use Jumbojett\OpenIDConnectClient;
 
+
+$request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
+    $_SERVER,
+    $_GET,
+    $_POST,
+    $_COOKIE,
+    $_FILES
+);
+
 $oidc = new OpenIDConnectClient('http://myproviderURL.com/',
                                 'ClientIDHere',
                                 'ClientSecretHere');
 
-$oidc->authenticate();
+$oidc->authenticate($request);
 $name = $oidc->requestUserInfo('given_name');
 
 ?>

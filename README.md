@@ -25,12 +25,19 @@ require '/vendor/autoload.php';
 
 ```php
 use Jumbojett\OpenIDConnectClient;
+$request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
+    $_SERVER,
+    $_GET,
+    $_POST,
+    $_COOKIE,
+    $_FILES
+);
 
 $oidc = new OpenIDConnectClient('https://id.provider.com',
                                 'ClientIDHere',
                                 'ClientSecretHere');
 $oidc->setCertPath('/path/to/my.cert');
-$oidc->authenticate();
+$oidc->authenticate($request);
 $name = $oidc->requestUserInfo('given_name');
 
 ```

@@ -34,9 +34,14 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_FILES
 );
 
-$oidc = new OpenIDConnectClient('http://myproviderURL.com/',
-                                'ClientIDHere',
-                                'ClientSecretHere');
+$sessionStorage = new \Jumbojett\PHPSessionBridge();
+
+$oidc = new OpenIDConnectClient(
+        $sessionStorage,
+        'http://myproviderURL.com/',
+        'ClientIDHere',
+    'ClientSecretHere')
+;
 
 $oidc->authenticate($request);
 $name = $oidc->requestUserInfo('given_name');

@@ -33,9 +33,14 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_FILES
 );
 
-$oidc = new OpenIDConnectClient('https://id.provider.com',
-                                'ClientIDHere',
-                                'ClientSecretHere');
+$sessionStorage = new \Jumbojett\PHPSessionBridge();
+
+$oidc = new OpenIDConnectClient(
+        $sessionStorage,
+        'https://id.provider.com',
+        'ClientIDHere',
+        'ClientSecretHere'
+        );
 $oidc->setCertPath('/path/to/my.cert');
 $oidc->authenticate($request);
 $name = $oidc->requestUserInfo('given_name');
@@ -55,7 +60,12 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_COOKIE,
     $_FILES
 );
-$oidc = new OpenIDConnectClient("https://id.provider.com");
+$sessionStorage = new \Jumbojett\PHPSessionBridge();
+
+$oidc = new OpenIDConnectClient(
+        $sessionStorage,
+        "https://id.provider.com"
+);
 
 $oidc->register($request);
 $client_id = $oidc->getClientID();
@@ -78,9 +88,13 @@ $oidc->setCertPath("/path/to/my.cert");
 ```php
 use Jumbojett\OpenIDConnectClient;
 
-$oidc = new OpenIDConnectClient('https://id.provider.com',
-                                'ClientIDHere',
-                                'ClientSecretHere');
+$sessionStorage = new \Jumbojett\PHPSessionBridge();
+
+$oidc = new OpenIDConnectClient(
+        $sessionStorage,
+        'https://id.provider.com',
+        'ClientIDHere',
+        'ClientSecretHere');
 $oidc->providerConfigParam(array('token_endpoint'=>'https://id.provider.com/connect/token'));
 $oidc->addScope('my_scope');
 
@@ -94,9 +108,13 @@ $clientCredentialsToken = $oidc->requestClientCredentialsToken()->access_token;
 ```php
 use Jumbojett\OpenIDConnectClient;
 
-$oidc = new OpenIDConnectClient('https://id.provider.com',
-                                'ClientIDHere',
-                                'ClientSecretHere');
+$sessionStorage = new \Jumbojett\PHPSessionBridge();
+
+$oidc = new OpenIDConnectClient(
+        $sessionStorage,
+        'https://id.provider.com',
+        'ClientIDHere',
+        'ClientSecretHere');
 $oidc->providerConfigParam(array('token_endpoint'=>'https://id.provider.com/connect/token'));
 $oidc->addScope('my_scope');
 

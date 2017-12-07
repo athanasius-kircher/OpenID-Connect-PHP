@@ -27,18 +27,7 @@ namespace Jumbojett;
 use Jumbojett\Exception\OpenIDConnectClientException;
 use Psr\Http\Message\ServerRequestInterface;
 
-/**
- * Use session to manage a nonce
- */
-if (!isset($_SESSION)) {
-    @session_start();
-}
 
-/**
- *
- * Please note this class stores nonces by default in $_SESSION['openid_connect_nonce']
- *
- */
 class OpenIDConnectClient
 {
 
@@ -136,18 +125,24 @@ class OpenIDConnectClient
      * @var int timeout (seconds)
      */
     protected $timeOut = 60;
+    /**
+     * @var SessionInterface
+     */
+    protected $sessionStorage;
 
     /**
+     * @param SessionInterface $sessionStorage
      * @param $provider_url string optional
      *
      * @param $client_id string optional
      * @param $client_secret string optional
      *
      */
-    public function __construct($provider_url = null, $client_id = null, $client_secret = null) {
-        $this->setProviderURL($provider_url);
-        $this->clientID = $client_id;
-        $this->clientSecret = $client_secret;
+    public function __construct(SessionInterface $sessionStorage, $provider_url = null, $client_id = null, $client_secret = null) {
+        $this -> setProviderURL($provider_url);
+        $this -> sessionStorage = $sessionStorage;
+        $this -> clientID = $client_id;
+        $this -> clientSecret = $client_secret;
     }
 
     /**
@@ -1117,7 +1112,7 @@ class OpenIDConnectClient
      * @return string
      */
     protected function setNonce($nonce) {
-        $_SESSION['openid_connect_nonce'] = $nonce;
+        $this -> sessionStorage -> set('openid_connect_nonce',$nonce);
         return $nonce;
     }
 
@@ -1127,7 +1122,7 @@ class OpenIDConnectClient
      * @return string
      */
     protected function getNonce() {
-        return $_SESSION['openid_connect_nonce'];
+        return $this -> sessionStorage -> get('openid_connect_nonce','');
     }
 
     /**
@@ -1136,7 +1131,7 @@ class OpenIDConnectClient
      * @return void
      */
     protected function unsetNonce() {
-        unset($_SESSION['openid_connect_nonce']);
+        $this -> sessionStorage -> unsetByKey('openid_connect_nonce');
     }
 
     /**
@@ -1146,7 +1141,7 @@ class OpenIDConnectClient
      * @return string
      */
     protected function setState($state) {
-        $_SESSION['openid_connect_state'] = $state;
+        $this -> sessionStorage -> set('openid_connect_state',$state);
         return $state;
     }
 
@@ -1156,7 +1151,7 @@ class OpenIDConnectClient
      * @return string
      */
     protected function getState() {
-        return $_SESSION['openid_connect_state'];
+        return $this -> sessionStorage -> get('openid_connect_state','');
     }
 
     /**
@@ -1165,7 +1160,7 @@ class OpenIDConnectClient
      * @return void
      */
     protected function unsetState() {
-        unset($_SESSION['openid_connect_state']);
+        $this -> sessionStorage -> unsetByKey('openid_connect_state');
     }
 
     /**

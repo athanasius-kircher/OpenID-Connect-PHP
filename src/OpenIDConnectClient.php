@@ -427,7 +427,6 @@ class OpenIDConnectClient
 
         $auth_endpoint .= (strpos($auth_endpoint, '?') === false ? '?' : '&') . http_build_query($auth_params, null, '&');
 
-        session_commit();
         $this->redirect($auth_endpoint);
     }
 

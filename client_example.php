@@ -43,7 +43,11 @@ $oidc = new OpenIDConnectClient(
     'ClientSecretHere')
 ;
 
-$oidc->authenticate($request);
+
+
+$redirectUrl = \Jumbojett\Utilities::getCurrentUri($request);//or take your own uri
+
+$oidc->authenticate($request,$redirectUrl);
 $name = $oidc->requestUserInfo('given_name');
 
 ?>

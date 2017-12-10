@@ -161,10 +161,11 @@ class OpenIDConnectClient
 
     /**
      * @param ServerRequestInterface $request
+     * @param string $redirectUri
      * @return bool
      * @throws OpenIDConnectClientException
      */
-    public function authenticate(ServerRequestInterface $request) {
+    public function authenticate(ServerRequestInterface $request, $redirectUri) {
 
         // Do a preemptive check to see if the provider has thrown an error from a previous redirect
         if ($error = Utilities::getParameterFromRequest($request,'error',false)) {
@@ -176,7 +177,7 @@ class OpenIDConnectClient
         // If we have an authorization code then proceed to request a token
         if ($code = Utilities::getParameterFromRequest($request,'code',false)) {
 
-            $token_json = $this->requestTokens($code,$request);
+            $token_json = $this->requestTokens($code, $redirectUri);
 
             // Throw an error if the server returns one
             if (isset($token_json->error)) {
@@ -239,7 +240,7 @@ class OpenIDConnectClient
 
         } else {
 
-            $this->requestAuthorization($request);
+            $this->requestAuthorization($redirectUri);
             return false;
         }
 
@@ -325,63 +326,6 @@ class OpenIDConnectClient
         return $this->providerConfig[$param];
     }
 
-
-    /**
-     * @param string $url Sets redirect URL for auth flow
-     */
-    public function setRedirectURL ($url) {
-        if (parse_url($url,PHP_URL_HOST) !== false) {
-            $this->redirectURL = $url;
-        }
-    }
-
-    /**
-     * Gets the URL of the current page we are on, encodes, and returns it
-     * @param ServerRequestInterface $request
-     * @return string
-     */
-    public function getRedirectURL(ServerRequestInterface $request) {
-
-        // If the redirect URL has been set then return it.
-        if (property_exists($this, 'redirectURL') && $this->redirectURL) {
-            return $this->redirectURL;
-        }
-
-        // Other-wise return the URL of the current page
-
-        /**
-         * Thank you
-         * http://stackoverflow.com/questions/189113/how-do-i-get-current-page-full-url-in-php-on-a-windows-iis-server
-         */
-
-        /*
-         * Compatibility with multiple host headers.
-         * The problem with SSL over port 80 is resolved and non-SSL over port 443.
-         * Support of 'ProxyReverse' configurations.
-         */
-
-        $server = $request -> getServerParams();
-        if (isset($server["HTTP_UPGRADE_INSECURE_REQUESTS"]) && ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] == 1)) {
-            $protocol = 'https';
-        } else {
-            $protocol = @$server['HTTP_X_FORWARDED_PROTO']
-                ?: @$server['REQUEST_SCHEME']
-                ?: ((isset($server["HTTPS"]) && $server["HTTPS"] == "on") ? "https" : "http");
-        }
-
-        $port = @intval($server['HTTP_X_FORWARDED_PORT'])
-              ?: @intval($server["SERVER_PORT"])
-              ?: (($protocol === 'https') ? 443 : 80);
-
-        $host = @explode(":", $server['HTTP_HOST'])[0]
-              ?: @$server['SERVER_NAME']
-              ?: @$server['SERVER_ADDR'];
-
-        $port = (443 == $port) || (80 == $port) ? '' : ':' . $port;
-
-        return sprintf('%s://%s%s/%s', $protocol, $host, $port, @trim(reset(explode("?", $server['REQUEST_URI'])), '/'));
-    }
-
     /**
      * Used for arbitrary value generation for nonces and state
      *
@@ -392,9 +336,9 @@ class OpenIDConnectClient
     }
 
     /**
-     * @param ServerRequestInterface $request
+     * @param string $redirectUri
      */
-    private function requestAuthorization(ServerRequestInterface $request) {
+    private function requestAuthorization($redirectUri) {
 
         $auth_endpoint = $this->getProviderConfigValue("authorization_endpoint");
         $response_type = "code";
@@ -408,7 +352,7 @@ class OpenIDConnectClient
 
         $auth_params = array_merge($this->authParams, array(
             'response_type' => $response_type,
-            'redirect_uri' => $this->getRedirectURL($request),
+            'redirect_uri' => $redirectUri,
             'client_id' => $this->clientID,
             'nonce' => $nonce,
             'state' => $state,
@@ -494,10 +438,10 @@ class OpenIDConnectClient
      * Requests ID and Access tokens
      *
      * @param $code
-     * @param ServerRequestInterface $request
+     * @param string $redirectUri
      * @return mixed
      */
-    private function requestTokens($code,ServerRequestInterface $request) {
+    private function requestTokens($code, $redirectUri) {
         $token_endpoint = $this->getProviderConfigValue("token_endpoint");
         $token_endpoint_auth_methods_supported = $this->getProviderConfigValue("token_endpoint_auth_methods_supported", ['client_secret_basic']);
 
@@ -508,7 +452,7 @@ class OpenIDConnectClient
         $token_params = array(
             'grant_type' => $grant_type,
             'code' => $code,
-            'redirect_uri' => $this->getRedirectURL($request),
+            'redirect_uri' => $redirectUri,
             'client_id' => $this->clientID,
             'client_secret' => $this->clientSecret
         );
@@ -966,14 +910,15 @@ class OpenIDConnectClient
     /**
      * Dynamic registration
      * @param ServerRequestInterface $request
+     * @param string[] $redirectUris
      * @throws OpenIDConnectClientException
      */
-    public function register(ServerRequestInterface $request) {
+    public function register(array $redirectUris) {
 
         $registration_endpoint = $this->getProviderConfigValue('registration_endpoint');
 
         $send_object = (object)array(
-            'redirect_uris' => array($this->getRedirectURL($request)),
+            'redirect_uris' => $redirectUris,
             'client_name' => $this->getClientName()
         );
 

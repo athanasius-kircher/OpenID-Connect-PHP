@@ -33,6 +33,8 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_FILES
 );
 
+
+$redirectUrl = \Jumbojett\Utilities::getCurrentUri($request);//or take your own uri
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
 
 $oidc = new OpenIDConnectClient(
@@ -42,7 +44,7 @@ $oidc = new OpenIDConnectClient(
         'ClientSecretHere'
         );
 $oidc->setCertPath('/path/to/my.cert');
-$oidc->authenticate($request);
+$oidc->authenticate($request,$redirectUrl);
 $name = $oidc->requestUserInfo('given_name');
 
 ```
@@ -61,13 +63,13 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_FILES
 );
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
-
+$redirectUrls = [\Jumbojett\Utilities::getCurrentUri($request)];//or take your own uri
 $oidc = new OpenIDConnectClient(
         $sessionStorage,
         "https://id.provider.com"
 );
 
-$oidc->register($request);
+$oidc->register($request,$redirectUrls);
 $client_id = $oidc->getClientID();
 $client_secret = $oidc->getClientSecret();
 

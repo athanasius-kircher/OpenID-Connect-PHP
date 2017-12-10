@@ -24,6 +24,8 @@
 namespace Jumbojett;
 
 
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\GuzzleException;
 use Jumbojett\Exception\OpenIDConnectClientException;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -62,14 +64,9 @@ class OpenIDConnectClient
     private $certPath;
 
     /**
-     * @var bool Verify SSL peer on transactions
+     * @var bool|string Compare guzzle request:verify
      */
-    private $verifyPeer = true;
-
-    /**
-     * @var bool Verify peer hostname on transactions
-     */
-    private $verifyHost = true;
+    private $verify = true;
 
     /**
      * @var string if we aquire an access token it will be stored here
@@ -129,6 +126,10 @@ class OpenIDConnectClient
      * @var SessionInterface
      */
     protected $sessionStorage;
+    /**
+     * @var ClientInterface
+     */
+    protected $httpClient;
 
     /**
      * @param SessionInterface $sessionStorage
@@ -138,9 +139,10 @@ class OpenIDConnectClient
      * @param $client_secret string optional
      *
      */
-    public function __construct(SessionInterface $sessionStorage, $provider_url = null, $client_id = null, $client_secret = null) {
+    public function __construct(SessionInterface $sessionStorage, ClientInterface $httpClient, $provider_url = null, $client_id = null, $client_secret = null) {
         $this -> setProviderURL($provider_url);
         $this -> sessionStorage = $sessionStorage;
+        $this -> client = $httpClient;
         $this -> clientID = $client_id;
         $this -> clientSecret = $client_secret;
     }
@@ -722,90 +724,74 @@ class OpenIDConnectClient
      */
     protected function fetchURL($url, $post_body = null,$headers = array()) {
 
+        $client = $this -> httpClient;
 
-        // OK cool - then let's create a new cURL resource handle
-        $ch = curl_init();
+        try{
+            $options = [];
+            $method = 'GET';
 
-        // Determine whether this is a GET or POST
-        if ($post_body != null) {
-            // curl_setopt($ch, CURLOPT_POST, 1);
-	    // Alows to keep the POST method even after redirect
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $post_body);
+            // Determine whether this is a GET or POST
+            if ($post_body != null) {
+                $method = 'POST';
 
-            // Default content type is form encoded
-            $content_type = 'application/x-www-form-urlencoded';
+                // Default content type is form encoded
+                $content_type = 'application/x-www-form-urlencoded';
 
-            // Determine if this is a JSON payload and add the appropriate content type
-            if (is_object(json_decode($post_body))) {
-                $content_type = 'application/json';
+                // Determine if this is a JSON payload and add the appropriate content type
+                if (is_object(json_decode($post_body))) {
+                    $content_type = 'application/json';
+                }
+
+                // Add POST-specific headers
+                $headers[] = "Content-Type: {$content_type}";
+                $headers[] = 'Content-Length: ' . strlen($post_body);
+
             }
 
-            // Add POST-specific headers
-            $headers[] = "Content-Type: {$content_type}";
-            $headers[] = 'Content-Length: ' . strlen($post_body);
+            if (isset($this->httpProxy)) {
+                $options['proxy'] = $this -> httpProxy;
+            }
 
+            // Allows to follow redirect
+            $options['allow_redirects'] = [
+                'max'             => 5,
+                'strict'          => true,
+                'referer'         => false,
+                'protocols'       => ['http', 'https'],
+                'track_redirects' => false
+            ];
+
+            /**
+             * Set cert
+             * Otherwise ignore SSL peer verification
+             */
+            if (isset($this->certPath)) {
+                $options['cert'] = $this->certPath;
+            }
+            $options['verify'] = $this->verify;
+
+            // Timeout in seconds
+            $options['timeout'] = $this->timeOut;
+
+
+
+            $request = new \GuzzleHttp\Psr7\Request($method, $url,$headers,$post_body);
+
+            // Download the given URL, and return output
+            $response = $client -> send($request,$options);
+            $output = $response -> getBody();
+
+            // HTTP Response code from server may be required from subclass
+            $this->responseCode = $response -> getStatusCode();
+
+            return $output;
+
+        }catch(GuzzleException $e){
+            throw new OpenIDConnectClientException('Connection failed');
         }
 
-        // If we set some heaers include them
-        if(count($headers) > 0) {
-          curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        }
 
-        // Set URL to download
-        curl_setopt($ch, CURLOPT_URL, $url);
 
-        if (isset($this->httpProxy)) {
-            curl_setopt($ch, CURLOPT_PROXY, $this->httpProxy);
-        }
-
-        // Include header in result? (0 = yes, 1 = no)
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-
-	// Allows to follow redirect
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-
-        /**
-         * Set cert
-         * Otherwise ignore SSL peer verification
-         */
-        if (isset($this->certPath)) {
-            curl_setopt($ch, CURLOPT_CAINFO, $this->certPath);
-        }
-
-        if($this->verifyHost) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-        } else {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        }
-
-        if($this->verifyPeer) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        } else {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        }
-
-        // Should cURL return or print out the data? (true = return, false = print)
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        // Timeout in seconds
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeOut);
-
-        // Download the given URL, and return output
-        $output = curl_exec($ch);
-
-        // HTTP Response code from server may be required from subclass
-        $info = curl_getinfo($ch);
-        $this->responseCode = $info['http_code'];
-
-        if ($output === false) {
-            throw new OpenIDConnectClientException('Curl error: ' . curl_error($ch));
-        }
-
-        // Close the cURL resource, and free system resources
-        curl_close($ch);
-
-        return $output;
     }
 
     /**
@@ -852,34 +838,12 @@ class OpenIDConnectClient
     }
 
     /**
-     * @param bool $verifyPeer
+     * @param bool $verify
      */
-    public function setVerifyPeer($verifyPeer) {
-        $this->verifyPeer = $verifyPeer;
+    public function setVerify($verify) {
+        $this->verify = $verify;
     }
 
-    /**
-     * @param bool $verifyHost
-     */
-    public function setVerifyHost($verifyHost) {
-        $this->verifyHost = $verifyHost;
-    }
-
-    /**
-     * @return bool
-     */
-    public function getVerifyHost()
-    {
-        return $this->verifyHost;
-    }
-
-    /**
-     * @return bool
-     */
-    public function getVerifyPeer()
-    {
-        return $this->verifyPeer;
-    }
 
     /**
      *
@@ -1108,7 +1072,7 @@ class OpenIDConnectClient
     }
 
     /**
-     * Get the response code from last action/curl request.
+     * Get the response code from last action request.
      *
      * @return int
      */

@@ -5,8 +5,8 @@
         "php": ">=5.4",
         "phpseclib/phpseclib" : "2.0.1",
         "ext-json": "*",
-        "ext-curl": "*",
-        "psr/http-message": "^1.0"
+        "psr/http-message": "^1.0",
+        "guzzlehttp/guzzle": "^6.3"
     },
     "archive" : {
         "exclude" : [

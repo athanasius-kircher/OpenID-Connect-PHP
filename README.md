@@ -8,8 +8,7 @@ A special thanks goes to Justin Richer and Amanda Anganes for their help and sup
 
 # Requirements #
  1. PHP 5.4 or greater
- 2. CURL extension
- 3. JSON extension
+ 2. JSON extension
 
 ## Install ##
  1. Install library using composer
@@ -37,8 +36,11 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 $redirectUrl = \Jumbojett\Utilities::getCurrentUri($request);//or take your own uri
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
 
+$guzzleClient = new GuzzleHttp\Client();
+
 $oidc = new OpenIDConnectClient(
         $sessionStorage,
+        $guzzleClient,
         'https://id.provider.com',
         'ClientIDHere',
         'ClientSecretHere'
@@ -64,7 +66,11 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 );
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
 $redirectUrls = [\Jumbojett\Utilities::getCurrentUri($request)];//or take your own uri
+$guzzleClient = new GuzzleHttp\Client();
+
 $oidc = new OpenIDConnectClient(
+        $sessionStorage,
+        $guzzleClient,
         $sessionStorage,
         "https://id.provider.com"
 );
@@ -92,8 +98,11 @@ use Jumbojett\OpenIDConnectClient;
 
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
 
+$guzzleClient = new GuzzleHttp\Client();
+
 $oidc = new OpenIDConnectClient(
         $sessionStorage,
+        $guzzleClient,
         'https://id.provider.com',
         'ClientIDHere',
         'ClientSecretHere');
@@ -112,8 +121,11 @@ use Jumbojett\OpenIDConnectClient;
 
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
 
+$guzzleClient = new GuzzleHttp\Client();
+
 $oidc = new OpenIDConnectClient(
         $sessionStorage,
+        $guzzleClient,
         'https://id.provider.com',
         'ClientIDHere',
         'ClientSecretHere');

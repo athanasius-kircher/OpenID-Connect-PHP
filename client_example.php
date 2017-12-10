@@ -35,9 +35,11 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 );
 
 $sessionStorage = new \Jumbojett\PHPSessionBridge();
+$guzzleClient = new GuzzleHttp\Client();
 
 $oidc = new OpenIDConnectClient(
         $sessionStorage,
+        $guzzleClient,
         'http://myproviderURL.com/',
         'ClientIDHere',
     'ClientSecretHere')

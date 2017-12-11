@@ -6,7 +6,7 @@
  * Time: 22:15
  */
 
-namespace Jumbojett\Exception;
+namespace Athanasius\Exception;
 
 
 class OpenIDConnectClientException extends \Exception

@@ -21,12 +21,12 @@
  *
  */
 
-namespace Jumbojett;
+namespace Athanasius;
 
 
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
-use Jumbojett\Exception\OpenIDConnectClientException;
+use Athanasius\Exception\OpenIDConnectClientException;
 use Psr\Http\Message\ServerRequestInterface;
 
 

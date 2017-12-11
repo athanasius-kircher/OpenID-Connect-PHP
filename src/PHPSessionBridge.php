@@ -6,11 +6,11 @@
  * Time: 22:57
  */
 
-namespace Jumbojett;
+namespace Athanasius;
 
 /**
  * Class PHPSessionBridge simple session implementation
- * @package Jumbojett
+ * @package Athanasius
  */
 class PHPSessionBridge implements SessionInterface
 {

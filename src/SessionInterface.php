@@ -6,11 +6,11 @@
  * Time: 22:37
  */
 
-namespace Jumbojett;
+namespace Athanasius;
 
 /**
  * Interface SessionInterface
- * @package Jumbojett
+ * @package Athanasius
  */
 interface SessionInterface
 {

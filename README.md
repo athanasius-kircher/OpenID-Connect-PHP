@@ -7,7 +7,7 @@ the OpenID Connect protocol to setup authentication.
 A special thanks goes to Justin Richer and Amanda Anganes for their help and support of the protocol.
 
 # Requirements #
- 1. PHP 5.4 or greater
+ 1. PHP 5.6 or greater
  2. JSON extension
 
 ## Install ##

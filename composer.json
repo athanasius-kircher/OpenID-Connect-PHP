@@ -14,7 +14,9 @@
         ]
     },
     "autoload" : {
-         "classmap": [ "src/"]
+        "psr-4": {
+            "Athanasius\\": "src/"
+        },
     },
     "require-dev": {
         "zendframework/zend-diactoros": "^1.6"

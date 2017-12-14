@@ -526,7 +526,7 @@ final class OpenIDConnectClient
      *
      * @return string
      */
-    protected function getNonce() {
+    private function getNonce() {
         return $this -> sessionStorage -> get('openid_connect_nonce','');
     }
 
@@ -566,7 +566,7 @@ final class OpenIDConnectClient
      *
      * @return string
      */
-    protected function getState() {
+    private function getState() {
         return $this -> sessionStorage -> get('openid_connect_state','');
     }
 
@@ -575,7 +575,7 @@ final class OpenIDConnectClient
      *
      * @return void
      */
-    protected function unsetState() {
+    private function unsetState() {
         $this -> sessionStorage -> unsetByKey('openid_connect_state');
     }
 

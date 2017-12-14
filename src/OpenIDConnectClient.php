@@ -471,7 +471,7 @@ final class OpenIDConnectClient
     /**
      * @param $url
      */
-    public function redirect($url) {
+    private function redirect($url) {
         header('Location: ' . $url);
         exit;
     }

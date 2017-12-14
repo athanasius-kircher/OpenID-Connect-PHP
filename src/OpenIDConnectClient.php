@@ -27,19 +27,21 @@ namespace Athanasius;
 use Athanasius\Configuration\ProviderArray;
 use Athanasius\Configuration\ProviderInterface;
 use Athanasius\Exception\InvalidReponseType;
+use Athanasius\Exception\VerificationException;
 use Athanasius\HttpClient\ClientInterface;
 use Athanasius\Session\SessionInterface;
 use Athanasius\Exception\OpenIDConnectClientException;
 use Athanasius\Token\AccessToken;
 use Athanasius\Token\IdToken;
 use Athanasius\Token\RefreshToken;
+use Athanasius\Verification\JWTVerification;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 
 /**
  * Class OpenIDConnectClient
  * @package Athanasius
- * @todo externalize validation
- * @todo add class representations for tokens
  * @todo implement clean OpenID Spec methods and no aggregation as in authenticate
  * @todo add Unit Tests
  * @todo overwork examples
@@ -88,6 +90,10 @@ final class OpenIDConnectClient
      * @var ProviderInterface
      */
     private $configuration;
+    /**
+     * @var LoggerInterface
+     */
+    private $logger;
 
     /**
      * OpenIDConnectClient constructor.
@@ -106,6 +112,14 @@ final class OpenIDConnectClient
      */
     public function setResponseTypes($response_types) {
         $this->responseTypes = array_merge($this->responseTypes, (array)$response_types);
+    }
+
+    /**
+     * @param LoggerInterface $logger
+     */
+    public function setLogger($logger)
+    {
+        $this->logger = $logger;
     }
 
     /**
@@ -145,43 +159,47 @@ final class OpenIDConnectClient
 			$this->unsetState();
 
             if (!property_exists($token_json, 'id_token')) {
-                throw new OpenIDConnectClientException("User did not authorize openid scope.");
+                throw new InvalidReponseType("User did not authorize openid scope.");
+            }
+            $verification = new JWTVerification();
+            $jwk = $this -> configuration -> getJWK();
+            $idToken = new IdToken($token_json -> id_token);
+            $accessToken = null;
+            if($token_json -> access_token){
+                $accessToken = new AccessToken($token_json -> access_token);
+            }
+            try{
+                if (!$verification -> verifyJWTsignature($idToken,$jwk,$this -> configuration)) {
+                    $this -> log(LogLevel::DEBUG, 'Unable to verify signature',['configuration'=>$this -> configuration,'idToken'=>$idToken,'jwk'=>$jwk]);
+                    throw new VerificationException("Unable to verify signature");
+                }
+
+                // If this is a valid claim
+                if (!$verification->verifyJWTclaims($idToken,$this -> configuration,$this -> getNonce(), $accessToken)) {
+                    $this -> log(LogLevel::DEBUG, 'Unable to verify JWT claims',['configuration'=>$this -> configuration,'idToken'=>$idToken,'accessToken'=>$accessToken]);
+                    throw new VerificationException("Unable to verify JWT claims");
+                }
+            }catch(VerificationException $exception){
+                $this -> log(LogLevel::DEBUG, 'Unable to verify JWT claims',['configuration'=>$this -> configuration,'idToken'=>$idToken,'accessToken'=>$accessToken,'jwk'=>$jwk]);
+                throw new VerificationException("Unable to verify JWT claims",0,$exception);
             }
 
-            $claims = $this->decodeJWT($token_json->id_token, 1);
+            // Clean up the session a little
+            $this->unsetNonce();
 
-		        if (!$this-> configuration -> getProviderConfigValue('jwks_uri')) {
-                    throw new OpenIDConnectClientException ("Unable to verify signature due to no jwks_uri being defined");
-                }
-                if (!$this->verifyJWTsignature($token_json->id_token)) {
-                    throw new OpenIDConnectClientException ("Unable to verify signature");
-                }
+            // Save the id token
+            $this->idToken = $idToken;
 
+            // Save the access token
+            $this->accessToken = $accessToken;
 
-            // If this is a valid claim
-            if ($this->verifyJWTclaims($claims, $token_json->access_token)) {
-
-                // Clean up the session a little
-                $this->unsetNonce();
-
-                // Save the id token
-                $this->idToken = $token_json->id_token;
-
-                // Save the access token
-                $this->accessToken = $token_json->access_token;
-
-                // Save the refresh token, if we got one
-                if (isset($token_json->refresh_token)) $this->refreshToken = $token_json->refresh_token;
-
-                // Success!
-                return true;
-
-            } else {
-                throw new OpenIDConnectClientException ("Unable to verify JWT claims");
+            // Save the refresh token, if we got one
+            if (isset($token_json->refresh_token)){
+                $this->refreshToken = new RefreshToken($token_json->refresh_token);
             }
-
+            // Success!
+            return true;
         } else {
-
             $this->requestAuthorization($redirectUri);
             return false;
         }
@@ -394,166 +412,6 @@ final class OpenIDConnectClient
     }
 
     /**
-      * @param array $keys
-      * @param array $header
-      * @throws OpenIDConnectClientException
-      * @return object
-      */
-     private function get_key_for_header($keys, $header) {
-         foreach ($keys as $key) {
-             if ($key->kty == 'RSA') {
-                 if (!isset($header->kid) || $key->kid == $header->kid) {
-                     return $key;
-                 }
-             } else {
-                 if ($key->alg == $header->alg && $key->kid == $header->kid) {
-                     return $key;
-                 }
-             }
-         }
-         if (isset($header->kid)) {
-             throw new OpenIDConnectClientException('Unable to find a key for (algorithm, kid):' . $header->alg . ', ' . $header->kid . ')');
-         } else {
-             throw new OpenIDConnectClientException('Unable to find a key for RSA');
-         }
-     }
-
-
-    /**
-     * @param string $hashtype
-     * @param object $key
-     * @throws OpenIDConnectClientException
-     * @return bool
-     */
-    private function verifyRSAJWTsignature($hashtype, $key, $payload, $signature) {
-        if (!class_exists('\phpseclib\Crypt\RSA') && !class_exists('Crypt_RSA')) {
-            throw new OpenIDConnectClientException('Crypt_RSA support unavailable.');
-        }
-        if (!(property_exists($key, 'n') and property_exists($key, 'e'))) {
-            throw new OpenIDConnectClientException('Malformed key object');
-        }
-
-        /* We already have base64url-encoded data, so re-encode it as
-           regular base64 and use the XML key format for simplicity.
-        */
-        $public_key_xml = "<RSAKeyValue>\r\n".
-            "  <Modulus>" . b64url2b64($key->n) . "</Modulus>\r\n" .
-            "  <Exponent>" . b64url2b64($key->e) . "</Exponent>\r\n" .
-            "</RSAKeyValue>";
-	if(class_exists('Crypt_RSA')) {
-        	$rsa = new Crypt_RSA();
-		$rsa->setHash($hashtype);
-        	$rsa->loadKey($public_key_xml, Crypt_RSA::PUBLIC_FORMAT_XML);
-        	$rsa->signatureMode = Crypt_RSA::SIGNATURE_PKCS1;
-	} else {
-		$rsa = new \phpseclib\Crypt\RSA();
-		$rsa->setHash($hashtype);
-        	$rsa->loadKey($public_key_xml, \phpseclib\Crypt\RSA::PUBLIC_FORMAT_XML);
-        	$rsa->signatureMode = \phpseclib\Crypt\RSA::SIGNATURE_PKCS1;
-	}
-        return $rsa->verify($payload, $signature);
-    }
-	
-    /**
-     * @param string $hashtype
-     * @param string $key
-     * @throws OpenIDConnectClientException
-     * @return bool
-     */
-    private function verifyHMACJWTsignature($hashtype, $key, $payload, $signature)
-    {
-        if (!function_exists('hash_hmac')) {
-            throw new OpenIDConnectClientException('hash_hmac support unavailable.');
-        }
-
-        $expected=hash_hmac($hashtype, $payload, $key, true);
-
-        if (function_exists('hash_equals')) {
-            return hash_equals($signature, $expected);
-        } else {
-            return self::hashEquals($signature, $expected);
-        }
-    }
-
-    /**
-     * @param $jwt string encoded JWT
-     * @throws OpenIDConnectClientException
-     * @return bool
-     */
-    private function verifyJWTsignature($jwt) {
-        $parts = explode(".", $jwt);
-        $signature = Utilities::base64urlDecode(array_pop($parts));
-        $header = json_decode(Utilities::base64urlDecode($parts[0]));
-        $payload = implode(".", $parts);
-
-        $response = $this -> httpClient -> sendGet($this-> configuration -> getProviderConfigValue('jwks_uri'));
-        $body = $response -> getBody();
-        $jwks = json_decode($body);
-        if(null === $jwks){
-            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
-        }
-        if ($jwks === NULL) {
-            throw new OpenIDConnectClientException('Error decoding JSON from jwks_uri');
-        }
-        $verified = false;
-        switch ($header->alg) {
-        case 'RS256':
-        case 'RS384':
-        case 'RS512':
-            $hashtype = 'sha' . substr($header->alg, 2);
-
-            $verified = $this->verifyRSAJWTsignature($hashtype,
-                                                     $this->get_key_for_header($jwks->keys, $header),
-                                                     $payload, $signature);
-            break;
-	case 'HS256':
-        case 'HS512':
-        case 'HS384':
-            $hashtype = 'SHA' . substr($header->alg, 2);
-            $verified = $this->verifyHMACJWTsignature($hashtype, $this -> configuration -> getClientSecret(), $payload, $signature);
-            break;		
-        default:
-            throw new OpenIDConnectClientException('No support for signature type: ' . $header->alg);
-        }
-        return $verified;
-    }
-
-    /**
-     * @param object $claims
-     * @return bool
-     */
-    private function verifyJWTclaims($claims, $accessToken = null) {
-	if(isset($claims->at_hash) && isset($accessToken)){
-            if(isset($this->getAccessTokenHeader()->alg) && $this->getAccessTokenHeader()->alg != 'none'){
-                $bit = substr($this->getAccessTokenHeader()->alg, 2, 3);
-            }else{
-                // TODO: Error case. throw exception???
-                $bit = '256';
-            }
-            $len = ((int)$bit)/16;
-            $expecte_at_hash = $this->urlEncode(substr(hash('sha'.$bit, $accessToken, true), 0, $len));
-        }
-        return (($claims->iss == $this->configuration -> getProviderUrl())
-            && (($claims->aud == $this->configuration -> getClientId()) || (in_array($this->configuration -> getClientId(), $claims->aud)))
-            && ($claims->nonce == $this->getNonce())
-            && ( !isset($claims->exp) || $claims->exp >= time())
-            && ( !isset($claims->nbf) || $claims->nbf <= time())
-            && ( !isset($claims->at_hash) || $claims->at_hash == $expecte_at_hash )
-        );
-    }
-
-    /**
-     * @param string $str
-     * @return string
-     */
-    protected function urlEncode($str) {
-        $enc = base64_encode($str);
-        $enc = rtrim($enc, "=");
-        $enc = strtr($enc, "+/", "-_");
-        return $enc;
-    }
-
-    /**
      *
      * @param $attribute string optional
      *
@@ -662,17 +520,6 @@ final class OpenIDConnectClient
     }
 
     /**
-     * Stores nonce
-     *
-     * @param string $nonce
-     * @return string
-     */
-    protected function setNonce($nonce) {
-        $this -> sessionStorage -> set('openid_connect_nonce',$nonce);
-        return $nonce;
-    }
-
-    /**
      * Get stored nonce
      *
      * @return string
@@ -682,11 +529,22 @@ final class OpenIDConnectClient
     }
 
     /**
+     * Stores nonce
+     *
+     * @param string $nonce
+     * @return string
+     */
+    private function setNonce($nonce) {
+        $this -> sessionStorage -> set('openid_connect_nonce',$nonce);
+        return $nonce;
+    }
+
+    /**
      * Cleanup nonce
      *
      * @return void
      */
-    protected function unsetNonce() {
+    private function unsetNonce() {
         $this -> sessionStorage -> unsetByKey('openid_connect_nonce');
     }
 
@@ -696,7 +554,7 @@ final class OpenIDConnectClient
      * @param string $state
      * @return string
      */
-    protected function setState($state) {
+    private function setState($state) {
         $this -> sessionStorage -> set('openid_connect_state',$state);
         return $state;
     }
@@ -718,39 +576,10 @@ final class OpenIDConnectClient
     protected function unsetState() {
         $this -> sessionStorage -> unsetByKey('openid_connect_state');
     }
-	
-    /**
-     * Safely calculate length of binary string
-     * @param string
-     * @return int
-     */
-    private static function safeLength($str)
-    {
-        if (function_exists('mb_strlen')) {
-            return mb_strlen($str, '8bit');
-        }
-        return strlen($str);
-    }
 
-    /**
-     * Where has_equals is not available, this provides a timing-attack safe string comparison
-     * @param $str1
-     * @param $str2
-     * @return bool
-     */
-    private static function hashEquals($str1, $str2)
-    {
-        $len1=static::safeLength($str1);
-        $len2=static::safeLength($str2);
-
-        //compare strings without any early abort...
-        $len = min($len1, $len2);
-        $status = 0;
-        for ($i = 0; $i < $len; $i++) {
-            $status |= (ord($str1[$i]) ^ ord($str2[$i]));
+    private function log($level,$message,array $context = array()){
+        if($this -> logger){
+            $this -> logger -> log($level,$message,$context);
         }
-        //if strings were different lengths, we fail
-        $status |= ($len1 ^ $len2);
-        return ($status === 0);
     }
 }

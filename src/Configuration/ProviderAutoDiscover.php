@@ -9,7 +9,9 @@
 namespace Athanasius\Configuration;
 
 use Athanasius\Exception\ConfigurationException;
+use Athanasius\Exception\InvalidReponseType;
 use Athanasius\HttpClient\ClientInterface;
+use Athanasius\Verification\JWK;
 
 final class ProviderAutoDiscover extends ProviderArray
 {
@@ -63,6 +65,25 @@ final class ProviderAutoDiscover extends ProviderArray
             } else {
                 throw new ConfigurationException(sprintf('The provider "%s" has not been set. Make sure your provider has a well known configuration available.',$param));
             }
+        }
+    }
+
+    /**
+     * @return JWK
+     */
+    public function getJWK(){
+        try{
+            $config = parent::getJWK();
+            return $config;
+        }catch(ConfigurationException $e){
+            $jwkEndpoint = $this -> getProviderConfigValue('jwks_uri');
+            $response = $this -> httpClient -> sendGet($jwkEndpoint);
+            $body = $response -> getBody();
+            $jwks = json_decode($body);
+            if(null === $jwks){
+                throw new ConfigurationException('Json could not be converted from response [%s]',$body);
+            }
+            return new JWK($body);
         }
     }
 }

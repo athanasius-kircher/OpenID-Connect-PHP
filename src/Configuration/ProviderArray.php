@@ -10,6 +10,8 @@ namespace Athanasius\Configuration;
 
 
 use Athanasius\Exception\ConfigurationException;
+use Athanasius\Exception\InvalidReponseType;
+use Athanasius\Verification\JWK;
 
 class ProviderArray implements ProviderInterface
 {
@@ -88,5 +90,15 @@ class ProviderArray implements ProviderInterface
         return $this->configuration[$param];
     }
 
-
+    /**
+     * @return JWK
+     */
+    public function getJWK(){
+        $jwkJsonString = $this-> configuration -> getProviderConfigValue('jwks');
+        $jwks = json_decode($jwkJsonString);
+        if(null === $jwks){
+            throw new ConfigurationException('Json could not be converted from response [%s]',$jwkJsonString);
+        }
+        return new JWK($jwkJsonString);
+    }
 }

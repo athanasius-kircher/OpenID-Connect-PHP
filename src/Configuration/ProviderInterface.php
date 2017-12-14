@@ -9,6 +9,7 @@
 namespace Athanasius\Configuration;
 
 use Athanasius\Exception\ConfigurationException;
+use Athanasius\Verification\JWK;
 
 interface ProviderInterface
 {
@@ -31,4 +32,8 @@ interface ProviderInterface
      * @throws ConfigurationException
      */
     public function getProviderConfigValue($param, $default = null);
+    /**
+     * @return JWK
+     */
+    public function getJWK();
 }

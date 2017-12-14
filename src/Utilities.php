@@ -74,7 +74,7 @@ class Utilities
      * but we'll do it anyway.
      *
      */
-    private static function b64url2b64($base64url) {
+    public static function b64url2b64($base64url) {
         // "Shouldn't" be necessary, but why not
         $padding = strlen($base64url) % 4;
         if ($padding > 0) {

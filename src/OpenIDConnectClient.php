@@ -44,7 +44,9 @@ use Psr\Log\LogLevel;
  * @package Athanasius
  * @todo implement clean OpenID Spec methods and no aggregation as in authenticate
  * @todo add Unit Tests
+ * @todo support third party login
  * @todo overwork examples
+ * @todo allow additional claims
  */
 final class OpenIDConnectClient
 {

@@ -34,6 +34,7 @@ use Athanasius\Exception\OpenIDConnectClientException;
 use Athanasius\Token\AccessToken;
 use Athanasius\Token\IdToken;
 use Athanasius\Token\RefreshToken;
+use Athanasius\Token\Token;
 use Athanasius\Verification\JWTVerification;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
@@ -213,22 +214,22 @@ final class OpenIDConnectClient
      * Connect provider that the end-user has logged out of the relying party site
      * (the client application).
      *
-     * @param string $accessToken ID token (obtained at login)
+     * @param AccessToken $accessToken ID token (obtained at login)
      * @param string $redirect URL to which the RP is requesting that the End-User's User Agent
      * be redirected after a logout has been performed. The value MUST have been previously
      * registered with the OP. Value can be null.
      *
      */
-    public function signOut($accessToken, $redirect) {
+    public function signOut(AccessToken $accessToken, $redirect) {
         $signout_endpoint = $this-> configuration -> getProviderConfigValue("end_session_endpoint");
 
         $signout_params = null;
         if($redirect == null){
-          $signout_params = array('id_token_hint' => $accessToken);
+          $signout_params = array('id_token_hint' => $accessToken -> getTokenString());
         }
         else {
           $signout_params = array(
-                'id_token_hint' => $accessToken,
+                'id_token_hint' => $accessToken -> getTokenString(),
                 'post_logout_redirect_uri' => $redirect);
         }
 
@@ -391,14 +392,14 @@ final class OpenIDConnectClient
      * @param $code
      * @return RefreshToken
      */
-    public function refreshToken($refresh_token) {
+    public function refreshToken(Token $refresh_token) {
         $token_endpoint = $this-> configuration -> getProviderConfigValue("token_endpoint");
 
         $grant_type = "refresh_token";
 
         $token_params = array(
             'grant_type' => $grant_type,
-            'refresh_token' => $refresh_token,
+            'refresh_token' => $refresh_token -> getTokenString(),
             'client_id' => $this->configuration -> getClientId(),
             'client_secret' => $this->configuration -> getClientSecret(),
         );
@@ -414,7 +415,7 @@ final class OpenIDConnectClient
     }
 
     /**
-     *
+     * @param $accessToken AccessToken optional
      * @param $attribute string optional
      *
      * Attribute        Type    Description
@@ -440,7 +441,7 @@ final class OpenIDConnectClient
      * @return mixed
      *
      */
-    public function requestUserInfo($attribute = null) {
+    public function requestUserInfo(AccessToken $accessToken,$attribute = null) {
 
         $user_info_endpoint = $this-> configuration -> getProviderConfigValue("userinfo_endpoint");
         $schema = 'openid';
@@ -448,7 +449,7 @@ final class OpenIDConnectClient
         $user_info_endpoint .= "?schema=" . $schema;
 
         //The accessToken has to be send in the Authorization header, so we create a new array with only this header.
-        $headers = array("Authorization: Bearer {$this->accessToken}");
+        $headers = array("Authorization: Bearer {$accessToken -> getTokenString()}");
 
         $response = $this -> httpClient -> sendGet($user_info_endpoint, $headers);
         $body = $response -> getBody();

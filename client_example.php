@@ -36,14 +36,19 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 
 $sessionStorage = new \Athanasius\PHPSessionBridge();
 $guzzleClient = new GuzzleHttp\Client();
+$configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
+    $guzzleClient,
+    'http://myproviderURL.com/',
+    'ClientIDHere',
+    'ClientSecretHere'
+
+);
 
 $oidc = new OpenIDConnectClient(
+        $configuration,
         $sessionStorage,
-        $guzzleClient,
-        'http://myproviderURL.com/',
-        'ClientIDHere',
-    'ClientSecretHere')
-;
+        $guzzleClient
+);
 
 
 

@@ -24,6 +24,8 @@
 namespace Athanasius;
 
 
+use Athanasius\Configuration\ProviderArray;
+use Athanasius\Configuration\ProviderInterface;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use Athanasius\Exception\OpenIDConnectClientException;
@@ -34,19 +36,9 @@ class OpenIDConnectClient
 {
 
     /**
-     * @var string arbitrary id value
-     */
-    private $clientID;
-
-    /*
      * @var string arbitrary name value
      */
     private $clientName;
-
-    /**
-     * @var string arbitrary secret value
-     */
-    private $clientSecret;
 
     /**
      * @var array holds the provider configuration
@@ -130,6 +122,10 @@ class OpenIDConnectClient
      * @var ClientInterface
      */
     protected $httpClient;
+    /**
+     * @var ProviderInterface
+     */
+    protected $configuration;
 
     /**
      * @param SessionInterface $sessionStorage
@@ -139,19 +135,10 @@ class OpenIDConnectClient
      * @param $client_secret string optional
      *
      */
-    public function __construct(SessionInterface $sessionStorage, ClientInterface $httpClient, $provider_url = null, $client_id = null, $client_secret = null) {
-        $this -> setProviderURL($provider_url);
+    public function __construct(ProviderInterface $configuration, SessionInterface $sessionStorage, ClientInterface $httpClient) {
         $this -> sessionStorage = $sessionStorage;
+        $this -> configuration = $configuration;
         $this -> client = $httpClient;
-        $this -> clientID = $client_id;
-        $this -> clientSecret = $client_secret;
-    }
-
-    /**
-     * @param $provider_url
-     */
-    public function setProviderURL($provider_url) {
-        $this->providerConfig['issuer'] = $provider_url;
     }
 
     /**
@@ -305,7 +292,7 @@ class OpenIDConnectClient
         // This is also known as auto "discovery"
         if (!isset($this->providerConfig[$param])) {
 	    if(!$this->wellKnown){
-            	$well_known_config_url = rtrim($this->getProviderURL(),"/") . "/.well-known/openid-configuration";
+            	$well_known_config_url = rtrim($this->configuration -> getProviderUrl(),"/") . "/.well-known/openid-configuration";
             	$this->wellKnown = json_decode($this->fetchURL($well_known_config_url));
 	    }
 
@@ -355,7 +342,7 @@ class OpenIDConnectClient
         $auth_params = array_merge($this->authParams, array(
             'response_type' => $response_type,
             'redirect_uri' => $redirectUri,
-            'client_id' => $this->clientID,
+            'client_id' => $this -> configuration -> getClientId(),
             'nonce' => $nonce,
             'state' => $state,
             'scope' => 'openid'
@@ -389,8 +376,8 @@ class OpenIDConnectClient
 
         $post_data = array(
             'grant_type'    => $grant_type,
-            'client_id'     => $this->clientID,
-            'client_secret' => $this->clientSecret,
+            'client_id'     => $this->configuration -> getClientId(),
+            'client_secret' => $this->configuration -> getClientSecret(),
             'scope'         => implode(' ', $this->scopes)
         );
 
@@ -401,7 +388,7 @@ class OpenIDConnectClient
     }
 
 
- /**
+    /**
      * Requests a resource owner token
      * (Defined in https://tools.ietf.org/html/rfc6749#section-4.3)
      * 
@@ -423,8 +410,8 @@ class OpenIDConnectClient
 
         //For client authentication include the client values
         if($bClientAuth) {
-            $post_data['client_id']     = $this->clientID;
-            $post_data['client_secret'] = $this->clientSecret;
+            $post_data['client_id']     = $this->configuration -> getClientId();
+            $post_data['client_secret'] = $this->configuration -> getClientSecret();
         }
 
         // Convert token params to string format
@@ -455,13 +442,13 @@ class OpenIDConnectClient
             'grant_type' => $grant_type,
             'code' => $code,
             'redirect_uri' => $redirectUri,
-            'client_id' => $this->clientID,
-            'client_secret' => $this->clientSecret
+            'client_id' => $this->configuration -> getClientId(),
+            'client_secret' => $this->configuration -> getClientSecret()
         );
 
         # Consider Basic authentication if provider config is set this way
         if (in_array('client_secret_basic', $token_endpoint_auth_methods_supported)) {
-            $headers = ['Authorization: Basic ' . base64_encode($this->clientID . ':' . $this->clientSecret)];
+            $headers = ['Authorization: Basic ' . base64_encode($this->configuration -> getClientId() . ':' . $this->configuration -> getClientSecret())];
             unset($token_params['client_secret']);
         }
 
@@ -486,8 +473,8 @@ class OpenIDConnectClient
         $token_params = array(
             'grant_type' => $grant_type,
             'refresh_token' => $refresh_token,
-            'client_id' => $this->clientID,
-            'client_secret' => $this->clientSecret,
+            'client_id' => $this->configuration -> getClientId(),
+            'client_secret' => $this->configuration -> getClientSecret(),
         );
 
         // Convert token params to string format
@@ -611,7 +598,7 @@ class OpenIDConnectClient
         case 'HS512':
         case 'HS384':
             $hashtype = 'SHA' . substr($header->alg, 2);
-            $verified = $this->verifyHMACJWTsignature($hashtype, $this->getClientSecret(), $payload, $signature);
+            $verified = $this->verifyHMACJWTsignature($hashtype, $this -> configuration -> getClientSecret(), $payload, $signature);
             break;		
         default:
             throw new OpenIDConnectClientException('No support for signature type: ' . $header->alg);
@@ -634,8 +621,8 @@ class OpenIDConnectClient
             $len = ((int)$bit)/16;
             $expecte_at_hash = $this->urlEncode(substr(hash('sha'.$bit, $accessToken, true), 0, $len));
         }
-        return (($claims->iss == $this->getProviderURL())
-            && (($claims->aud == $this->clientID) || (in_array($this->clientID, $claims->aud)))
+        return (($claims->iss == $this->configuration -> getProviderUrl())
+            && (($claims->aud == $this->configuration -> getClientId()) || (in_array($this->configuration -> getClientId(), $claims->aud)))
             && ($claims->nonce == $this->getNonce())
             && ( !isset($claims->exp) || $claims->exp >= time())
             && ( !isset($claims->nbf) || $claims->nbf <= time())
@@ -795,19 +782,6 @@ class OpenIDConnectClient
     }
 
     /**
-     * @return string
-     * @throws OpenIDConnectClientException
-     */
-    public function getProviderURL() {
-
-        if (!isset($this->providerConfig['issuer'])) {
-            throw new OpenIDConnectClientException("The provider URL has not been set");
-        } else {
-            return $this->providerConfig['issuer'];
-        }
-    }
-
-    /**
      * @param $url
      */
     public function redirect($url) {
@@ -856,20 +830,6 @@ class OpenIDConnectClient
         $this->providerConfig = array_merge($this->providerConfig, $array);
     }
 
-    /**
-     * @param $clientSecret
-     */
-    public function setClientSecret($clientSecret) {
-        $this->clientSecret = $clientSecret;
-    }
-
-    /**
-     * @param $clientID
-     */
-    public function setClientID($clientID) {
-        $this->clientID = $clientID;
-    }
-
 
     /**
      * Dynamic registration
@@ -897,16 +857,19 @@ class OpenIDConnectClient
             throw new OpenIDConnectClientException($json_response->{'error_description'});
         }
 
-        $this->setClientID($json_response->{'client_id'});
-
         // The OpenID Connect Dynamic registration protocol makes the client secret optional
         // and provides a registration access token and URI endpoint if it is not present
-        if (isset($json_response->{'client_secret'})) {
-            $this->setClientSecret($json_response->{'client_secret'});
-        } else {
+        if (!isset($json_response->{'client_secret'})) {
             throw new OpenIDConnectClientException("Error registering:
                                                     Please contact the OpenID Connect provider and obtain a Client ID and Secret directly from them");
         }
+        $configuration = new ProviderArray(
+            $this -> configuration -> getProviderUrl(),
+            $json_response->{'client_id'},
+            $json_response->{'client_secret'}
+
+        );
+        return $configuration;
 
     }
 
@@ -922,20 +885,6 @@ class OpenIDConnectClient
      */
     public function setClientName($clientName) {
         $this->clientName = $clientName;
-    }
-
-    /**
-     * @return string
-     */
-    public function getClientID() {
-        return $this->clientID;
-    }
-
-    /**
-     * @return string
-     */
-    public function getClientSecret() {
-        return $this->clientSecret;
     }
 
     /**

@@ -13,7 +13,7 @@ A special thanks goes to Justin Richer and Amanda Anganes for their help and sup
 ## Install ##
  1. Install library using composer
 ```
-composer require jumbojett/openid-connect-php
+composer require Athanasius/openid-connect-php
 ```
  2. Include composer autoloader
 ```php
@@ -23,7 +23,7 @@ require '/vendor/autoload.php';
 ## Example 1: Basic Client ##
 
 ```php
-use Jumbojett\OpenIDConnectClient;
+use Athanasius\OpenIDConnectClient;
 $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_SERVER,
     $_GET,
@@ -33,8 +33,8 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 );
 
 
-$redirectUrl = \Jumbojett\Utilities::getCurrentUri($request);//or take your own uri
-$sessionStorage = new \Jumbojett\PHPSessionBridge();
+$redirectUrl = \Athanasius\Utilities::getCurrentUri($request);//or take your own uri
+$sessionStorage = new \Athanasius\PHPSessionBridge();
 
 $guzzleClient = new GuzzleHttp\Client();
 
@@ -56,7 +56,7 @@ $name = $oidc->requestUserInfo('given_name');
 ## Example 2: Dynamic Registration ##
 
 ```php
-use Jumbojett\OpenIDConnectClient;
+use Athanasius\OpenIDConnectClient;
 $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_SERVER,
     $_GET,
@@ -64,8 +64,8 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_COOKIE,
     $_FILES
 );
-$sessionStorage = new \Jumbojett\PHPSessionBridge();
-$redirectUrls = [\Jumbojett\Utilities::getCurrentUri($request)];//or take your own uri
+$sessionStorage = new \Athanasius\PHPSessionBridge();
+$redirectUrls = [\Athanasius\Utilities::getCurrentUri($request)];//or take your own uri
 $guzzleClient = new GuzzleHttp\Client();
 
 $oidc = new OpenIDConnectClient(
@@ -94,9 +94,9 @@ $oidc->setCertPath("/path/to/my.cert");
 ## Example 4: Request Client Credentials Token ##
 
 ```php
-use Jumbojett\OpenIDConnectClient;
+use Athanasius\OpenIDConnectClient;
 
-$sessionStorage = new \Jumbojett\PHPSessionBridge();
+$sessionStorage = new \Athanasius\PHPSessionBridge();
 
 $guzzleClient = new GuzzleHttp\Client();
 
@@ -117,9 +117,9 @@ $clientCredentialsToken = $oidc->requestClientCredentialsToken()->access_token;
 ## Example 5: Request Resource Owners Token (with client auth) ##
 
 ```php
-use Jumbojett\OpenIDConnectClient;
+use Athanasius\OpenIDConnectClient;
 
-$sessionStorage = new \Jumbojett\PHPSessionBridge();
+$sessionStorage = new \Athanasius\PHPSessionBridge();
 
 $guzzleClient = new GuzzleHttp\Client();
 

@@ -23,7 +23,7 @@
 
 require "../../autoload.php";
 
-use Jumbojett\OpenIDConnectClient;
+use Athanasius\OpenIDConnectClient;
 
 
 $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
@@ -34,7 +34,7 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_FILES
 );
 
-$sessionStorage = new \Jumbojett\PHPSessionBridge();
+$sessionStorage = new \Athanasius\PHPSessionBridge();
 $guzzleClient = new GuzzleHttp\Client();
 
 $oidc = new OpenIDConnectClient(
@@ -47,7 +47,7 @@ $oidc = new OpenIDConnectClient(
 
 
 
-$redirectUrl = \Jumbojett\Utilities::getCurrentUri($request);//or take your own uri
+$redirectUrl = \Athanasius\Utilities::getCurrentUri($request);//or take your own uri
 
 $oidc->authenticate($request,$redirectUrl);
 $name = $oidc->requestUserInfo('given_name');

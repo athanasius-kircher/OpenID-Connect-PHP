@@ -82,4 +82,13 @@ class Utilities
         }
         return strtr($base64url, '-_', '+/');
     }
+
+    /**
+     * Used for arbitrary value generation for nonces and state
+     *
+     * @return string
+     */
+    public static function generateRandString() {
+        return md5(uniqid(rand(), TRUE));
+    }
 }

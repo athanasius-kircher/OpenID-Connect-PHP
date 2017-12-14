@@ -35,7 +35,7 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 );
 
 $sessionStorage = new \Athanasius\Session\PHPSessionBridge();
-$guzzleClient = new GuzzleHttp\Client();
+$guzzleClient = new \Athanasius\HttpClient\GuzzleClient();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
     $guzzleClient,
     'http://myproviderURL.com/',

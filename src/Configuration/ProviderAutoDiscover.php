@@ -8,8 +8,8 @@
 
 namespace Athanasius\Configuration;
 
-
-use GuzzleHttp\ClientInterface;
+use Athanasius\Exception\ConfigurationException;
+use Athanasius\HttpClient\ClientInterface;
 
 class ProviderAutoDiscover extends ProviderArray
 {
@@ -17,49 +17,52 @@ class ProviderAutoDiscover extends ProviderArray
      * @var ClientInterface
      */
     private $httpClient;
+    /**
+     * @var \stdClass
+     */
+    private $wellKnown;
 
+    /**
+     * ProviderAutoDiscover constructor.
+     * @param ClientInterface $httpClient
+     * @param string $providerUrl
+     * @param string $clientId
+     * @param string $clientSecret
+     * @param array $configuration
+     */
     public function __construct(ClientInterface $httpClient, $providerUrl, $clientId = '', $clientSecret = '', array $configuration = [])
     {
         $this -> httpClient = $httpClient;
         parent::__construct($providerUrl, $clientId, $clientSecret, $configuration);
     }
 
-
     /**
-     * Get's anything that we need configuration wise including endpoints, and other values
-     *
-     * @param $param
-     * @param string $default optional
-     * @throws OpenIDConnectClientException
-     * @return string
-     *
+     * @param string $param
+     * @param null $default
+     * @return mixed|null
+     * @throws ConfigurationException
      */
-    private function getProviderConfigValue($param, $default = null) {
-
-        // If the configuration value is not available, attempt to fetch it from a well known config endpoint
-        // This is also known as auto "discovery"
-        if (!isset($this->providerConfig[$param])) {
+    public function getProviderConfigValue($param, $default = null) {
+        try{
+            $config = parent::getProviderConfigValue($param,$default);
+            return $config;
+        }catch(ConfigurationException $e){
             if(!$this->wellKnown){
-                $well_known_config_url = rtrim($this -> getProviderUrl(),"/") . "/.well-known/openid-configuration";
-                $this->wellKnown = json_decode($this->fetchURL($well_known_config_url));
+                $wellKnownUrl  = rtrim($this -> getProviderUrl(),"/") . "/.well-known/openid-configuration";
+                $response = $this -> httpClient -> sendGet($wellKnownUrl);
+                $configurationObject = json_decode($response -> getBody());
+                if(null === $configurationObject){
+                    throw new ConfigurationException(sprintf('Configuration could not be loaded under: "%s"',$wellKnownUrl));
+                }
+                $this->wellKnown = $configurationObject;
             }
-
-            $value = false;
             if(isset($this->wellKnown->{$param})){
-                $value = $this->wellKnown->{$param};
-            }
-
-            if ($value) {
-                $this->providerConfig[$param] = $value;
-            } elseif(isset($default)) {
-                // Uses default value if provided
-                $this->providerConfig[$param] = $default;
+                return $this->wellKnown->{$param};
+            }elseif(isset($default)) {
+                return $default;
             } else {
-                throw new OpenIDConnectClientException("The provider {$param} has not been set. Make sure your provider has a well known configuration available.");
+                throw new ConfigurationException(sprintf('The provider "%s" has not been set. Make sure your provider has a well known configuration available.',$param));
             }
-
         }
-
-        return $this->providerConfig[$param];
     }
 }

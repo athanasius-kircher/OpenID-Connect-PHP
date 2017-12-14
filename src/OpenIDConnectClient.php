@@ -26,41 +26,23 @@ namespace Athanasius;
 
 use Athanasius\Configuration\ProviderArray;
 use Athanasius\Configuration\ProviderInterface;
+use Athanasius\Exception\InvalidReponseType;
+use Athanasius\HttpClient\ClientInterface;
 use Athanasius\Session\SessionInterface;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\GuzzleException;
 use Athanasius\Exception\OpenIDConnectClientException;
 use Psr\Http\Message\ServerRequestInterface;
 
-
+/**
+ * Class OpenIDConnectClient
+ * @package Athanasius
+ * @todo externalize validation
+ * @todo add class representations for tokens
+ * @todo implement clean OpenID Spec methods and no aggregation as in authenticate
+ * @todo add Unit Tests
+ * @todo overwork examples
+ */
 class OpenIDConnectClient
 {
-
-    /**
-     * @var string arbitrary name value
-     */
-    private $clientName;
-
-    /**
-     * @var array holds the provider configuration
-     */
-    private $providerConfig = array();
-
-    /**
-     * @var string http proxy if necessary
-     */
-    private $httpProxy;
-
-    /**
-     * @var string full system path to the SSL certificate
-     */
-    private $certPath;
-
-    /**
-     * @var bool|string Compare guzzle request:verify
-     */
-    private $verify = true;
-
     /**
      * @var string if we aquire an access token it will be stored here
      */
@@ -87,11 +69,6 @@ class OpenIDConnectClient
     private $scopes = array();
 
     /**
-     * @var int|null Response code from the server
-     */
-    private $responseCode = null;
-
-    /**
      * @var array holds response types
      */
     private $responseTypes = array();
@@ -101,20 +78,6 @@ class OpenIDConnectClient
      */
     private $userInfo = array();
 
-    /**
-     * @var array holds authentication parameters
-     */
-    private $authParams = array();
-
-    /**
-     * @var mixed holds well-known openid server properties
-     */
-    private $wellKnown = false;
-
-    /**
-     * @var int timeout (seconds)
-     */
-    protected $timeOut = 60;
     /**
      * @var SessionInterface
      */
@@ -129,12 +92,10 @@ class OpenIDConnectClient
     protected $configuration;
 
     /**
+     * OpenIDConnectClient constructor.
+     * @param ProviderInterface $configuration
      * @param SessionInterface $sessionStorage
-     * @param $provider_url string optional
-     *
-     * @param $client_id string optional
-     * @param $client_secret string optional
-     *
+     * @param ClientInterface $httpClient
      */
     public function __construct(ProviderInterface $configuration, SessionInterface $sessionStorage, ClientInterface $httpClient) {
         $this -> sessionStorage = $sessionStorage;
@@ -193,7 +154,7 @@ class OpenIDConnectClient
 
             // Verify the signature
             if ($this->canVerifySignatures()) {
-		        if (!$this->getProviderConfigValue('jwks_uri')) {
+		        if (!$this-> configuration -> getProviderConfigValue('jwks_uri')) {
                     throw new OpenIDConnectClientException ("Unable to verify signature due to no jwks_uri being defined");
                 }
                 if (!$this->verifyJWTsignature($token_json->id_token)) {
@@ -248,7 +209,7 @@ class OpenIDConnectClient
      *
      */
     public function signOut($accessToken, $redirect) {
-        $signout_endpoint = $this->getProviderConfigValue("end_session_endpoint");
+        $signout_endpoint = $this-> configuration -> getProviderConfigValue("end_session_endpoint");
 
         $signout_params = null;
         if($redirect == null){
@@ -272,75 +233,23 @@ class OpenIDConnectClient
     }
 
     /**
-     * @param $param - example: prompt=login
-     */
-    public function addAuthParam($param) {
-        $this->authParams = array_merge($this->authParams, (array)$param);
-    }
-
-    /**
-     * Get's anything that we need configuration wise including endpoints, and other values
-     *
-     * @param $param
-     * @param string $default optional
-     * @throws OpenIDConnectClientException
-     * @return string
-     *
-     */
-    private function getProviderConfigValue($param, $default = null) {
-
-        // If the configuration value is not available, attempt to fetch it from a well known config endpoint
-        // This is also known as auto "discovery"
-        if (!isset($this->providerConfig[$param])) {
-	    if(!$this->wellKnown){
-            	$well_known_config_url = rtrim($this->configuration -> getProviderUrl(),"/") . "/.well-known/openid-configuration";
-            	$this->wellKnown = json_decode($this->fetchURL($well_known_config_url));
-	    }
-
-	    $value = false;
-	    if(isset($this->wellKnown->{$param})){
-                $value = $this->wellKnown->{$param};
-            }
-
-            if ($value) {
-                $this->providerConfig[$param] = $value;
-            } elseif(isset($default)) {
-                // Uses default value if provided
-                $this->providerConfig[$param] = $default;
-            } else {
-                throw new OpenIDConnectClientException("The provider {$param} has not been set. Make sure your provider has a well known configuration available.");
-            }
-
-        }
-
-        return $this->providerConfig[$param];
-    }
-
-    /**
-     * Used for arbitrary value generation for nonces and state
-     *
-     * @return string
-     */
-    protected function generateRandString() {
-        return md5(uniqid(rand(), TRUE));
-    }
-
-    /**
      * @param string $redirectUri
+     * @param array $authParams
+     * @todo check why authParams is needed here
      */
-    private function requestAuthorization($redirectUri) {
+    private function requestAuthorization($redirectUri,array $authParams = array()) {
 
-        $auth_endpoint = $this->getProviderConfigValue("authorization_endpoint");
+        $auth_endpoint = $this-> configuration -> getProviderConfigValue("authorization_endpoint");
         $response_type = "code";
 
         // Generate and store a nonce in the session
         // The nonce is an arbitrary value
-        $nonce = $this->setNonce($this->generateRandString());
+        $nonce = $this->setNonce(Utilities::generateRandString());
 
         // State essentially acts as a session key for OIDC
-        $state = $this->setState($this->generateRandString());
+        $state = $this->setState(Utilities::generateRandString());
 
-        $auth_params = array_merge($this->authParams, array(
+        $auth_params = array_merge($authParams, array(
             'response_type' => $response_type,
             'redirect_uri' => $redirectUri,
             'client_id' => $this -> configuration -> getClientId(),
@@ -369,7 +278,7 @@ class OpenIDConnectClient
      *
      */
     public function requestClientCredentialsToken() {
-        $token_endpoint = $this->getProviderConfigValue("token_endpoint");
+        $token_endpoint = $this-> configuration -> getProviderConfigValue("token_endpoint");
 
         $headers = [];
 
@@ -382,10 +291,13 @@ class OpenIDConnectClient
             'scope'         => implode(' ', $this->scopes)
         );
 
-        // Convert token params to string format
-        $post_params = http_build_query($post_data, null, '&');
-
-        return json_decode($this->fetchURL($token_endpoint, $post_params, $headers));
+        $response = $this -> httpClient -> sendPost($token_endpoint, $post_data, $headers);
+        $body = $response -> getBody();
+        $jsonObject = json_decode($body);
+        if(null === $jsonObject){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
+        return $jsonObject;
     }
 
 
@@ -395,8 +307,8 @@ class OpenIDConnectClient
      * 
      * @param $bClientAuth boolean Indicates that the Client ID and Secret be used for client authentication
      */
-    public function requestResourceOwnerToken($bClientAuth =  FALSE) {
-        $token_endpoint = $this->getProviderConfigValue("token_endpoint");
+    public function requestResourceOwnerToken($userName, $password, $bClientAuth =  FALSE) {
+        $token_endpoint = $this-> configuration -> getProviderConfigValue("token_endpoint");
 
         $headers = [];
 
@@ -404,8 +316,8 @@ class OpenIDConnectClient
 
         $post_data = array(
             'grant_type'    => $grant_type,
-            'username'      => $this->authParams['username'],
-            'password'      => $this->authParams['password'],
+            'username'      => $userName,
+            'password'      => $password,
             'scope'         => implode(' ', $this->scopes)
         );
 
@@ -414,14 +326,14 @@ class OpenIDConnectClient
             $post_data['client_id']     = $this->configuration -> getClientId();
             $post_data['client_secret'] = $this->configuration -> getClientSecret();
         }
-
-        // Convert token params to string format
-        $post_params = http_build_query($post_data, null, '&');
-
-        return json_decode($this->fetchURL($token_endpoint, $post_params, $headers));
+        $response = $this -> httpClient -> sendPost($token_endpoint, $post_data, $headers);
+        $body = $response -> getBody();
+        $jsonObject = json_decode($body);
+        if(null === $jsonObject){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
+        return $jsonObject;
     }
-
-
 
 
     /**
@@ -432,8 +344,8 @@ class OpenIDConnectClient
      * @return mixed
      */
     private function requestTokens($code, $redirectUri) {
-        $token_endpoint = $this->getProviderConfigValue("token_endpoint");
-        $token_endpoint_auth_methods_supported = $this->getProviderConfigValue("token_endpoint_auth_methods_supported", ['client_secret_basic']);
+        $token_endpoint = $this-> configuration -> getProviderConfigValue("token_endpoint");
+        $token_endpoint_auth_methods_supported = $this-> configuration -> getProviderConfigValue("token_endpoint_auth_methods_supported", ['client_secret_basic']);
 
         $headers = [];
 
@@ -453,11 +365,13 @@ class OpenIDConnectClient
             unset($token_params['client_secret']);
         }
 
-        // Convert token params to string format
-        $token_params = http_build_query($token_params, null, '&');
-
-        return json_decode($this->fetchURL($token_endpoint, $token_params, $headers));
-
+        $response = $this -> httpClient -> sendPost($token_endpoint, $token_params, $headers);
+        $body = $response -> getBody();
+        $jsonObject = json_decode($body);
+        if(null === $jsonObject){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
+        return $jsonObject;
     }
 
     /**
@@ -467,7 +381,7 @@ class OpenIDConnectClient
      * @return mixed
      */
     public function refreshToken($refresh_token) {
-        $token_endpoint = $this->getProviderConfigValue("token_endpoint");
+        $token_endpoint = $this-> configuration -> getProviderConfigValue("token_endpoint");
 
         $grant_type = "refresh_token";
 
@@ -478,13 +392,14 @@ class OpenIDConnectClient
             'client_secret' => $this->configuration -> getClientSecret(),
         );
 
-        // Convert token params to string format
-        $token_params = http_build_query($token_params, null, '&');
-
-        $json = json_decode($this->fetchURL($token_endpoint, $token_params));
-        $this->refreshToken = $json->refresh_token;
-
-        return $json;
+        $response = $this -> httpClient -> sendPost($token_endpoint, $token_params);
+        $body = $response -> getBody();
+        $jsonObject = json_decode($body);
+        if(null === $jsonObject){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
+        $this->refreshToken = $jsonObject->refresh_token;
+        return $jsonObject;
     }
 
     /**
@@ -511,7 +426,6 @@ class OpenIDConnectClient
              throw new OpenIDConnectClientException('Unable to find a key for RSA');
          }
      }
-
 
 
     /**
@@ -551,7 +465,7 @@ class OpenIDConnectClient
 	
     /**
      * @param string $hashtype
-     * @param object $key
+     * @param string $key
      * @throws OpenIDConnectClientException
      * @return bool
      */
@@ -580,7 +494,13 @@ class OpenIDConnectClient
         $signature = Utilities::base64urlDecode(array_pop($parts));
         $header = json_decode(Utilities::base64urlDecode($parts[0]));
         $payload = implode(".", $parts);
-        $jwks = json_decode($this->fetchURL($this->getProviderConfigValue('jwks_uri')));
+
+        $response = $this -> httpClient -> sendGet($this-> configuration -> getProviderConfigValue('jwks_uri'));
+        $body = $response -> getBody();
+        $jwks = json_decode($body);
+        if(null === $jwks){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
         if ($jwks === NULL) {
             throw new OpenIDConnectClientException('Error decoding JSON from jwks_uri');
         }
@@ -682,7 +602,7 @@ class OpenIDConnectClient
      */
     public function requestUserInfo($attribute = null) {
 
-        $user_info_endpoint = $this->getProviderConfigValue("userinfo_endpoint");
+        $user_info_endpoint = $this-> configuration -> getProviderConfigValue("userinfo_endpoint");
         $schema = 'openid';
 
         $user_info_endpoint .= "?schema=" . $schema;
@@ -690,9 +610,14 @@ class OpenIDConnectClient
         //The accessToken has to be send in the Authorization header, so we create a new array with only this header.
         $headers = array("Authorization: Bearer {$this->accessToken}");
 
-        $user_json = json_decode($this->fetchURL($user_info_endpoint,null,$headers));
+        $response = $this -> httpClient -> sendGet($user_info_endpoint, $headers);
+        $body = $response -> getBody();
+        $jsonObject = json_decode($body);
+        if(null === $jsonObject){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
 
-        $this->userInfo = $user_json;
+        $this->userInfo = $jsonObject;
 
         if($attribute === null) {
             return $this->userInfo;
@@ -705,85 +630,6 @@ class OpenIDConnectClient
 
     /**
      * @param $url
-     * @param null $post_body string If this is set the post type will be POST
-     * @param array() $headers Extra headers to be send with the request. Format as 'NameHeader: ValueHeader'
-     * @throws OpenIDConnectClientException
-     * @return mixed
-     */
-    protected function fetchURL($url, $post_body = null,$headers = array()) {
-
-        $client = $this -> httpClient;
-
-        try{
-            $options = [];
-            $method = 'GET';
-
-            // Determine whether this is a GET or POST
-            if ($post_body != null) {
-                $method = 'POST';
-
-                // Default content type is form encoded
-                $content_type = 'application/x-www-form-urlencoded';
-
-                // Determine if this is a JSON payload and add the appropriate content type
-                if (is_object(json_decode($post_body))) {
-                    $content_type = 'application/json';
-                }
-
-                // Add POST-specific headers
-                $headers[] = "Content-Type: {$content_type}";
-                $headers[] = 'Content-Length: ' . strlen($post_body);
-
-            }
-
-            if (isset($this->httpProxy)) {
-                $options['proxy'] = $this -> httpProxy;
-            }
-
-            // Allows to follow redirect
-            $options['allow_redirects'] = [
-                'max'             => 5,
-                'strict'          => true,
-                'referer'         => false,
-                'protocols'       => ['http', 'https'],
-                'track_redirects' => false
-            ];
-
-            /**
-             * Set cert
-             * Otherwise ignore SSL peer verification
-             */
-            if (isset($this->certPath)) {
-                $options['cert'] = $this->certPath;
-            }
-            $options['verify'] = $this->verify;
-
-            // Timeout in seconds
-            $options['timeout'] = $this->timeOut;
-
-
-
-            $request = new \GuzzleHttp\Psr7\Request($method, $url,$headers,$post_body);
-
-            // Download the given URL, and return output
-            $response = $client -> send($request,$options);
-            $output = $response -> getBody();
-
-            // HTTP Response code from server may be required from subclass
-            $this->responseCode = $response -> getStatusCode();
-
-            return $output;
-
-        }catch(GuzzleException $e){
-            throw new OpenIDConnectClientException('Connection failed');
-        }
-
-
-
-    }
-
-    /**
-     * @param $url
      */
     public function redirect($url) {
         header('Location: ' . $url);
@@ -791,101 +637,48 @@ class OpenIDConnectClient
     }
 
     /**
-     * @param $httpProxy
-     */
-    public function setHttpProxy($httpProxy) {
-        $this->httpProxy = $httpProxy;
-    }
-
-    /**
-     * @param $certPath
-     */
-    public function setCertPath($certPath) {
-        $this->certPath = $certPath;
-    }
-
-    /**
-     * @return string|null
-     */
-    public function getCertPath()
-    {
-        return $this->certPath;
-    }
-
-    /**
-     * @param bool $verify
-     */
-    public function setVerify($verify) {
-        $this->verify = $verify;
-    }
-
-
-    /**
-     *
-     * Use this to alter a provider's endpoints and other attributes
-     *
-     * @param $array
-     *        simple key => value
-     */
-    public function providerConfigParam($array) {
-        $this->providerConfig = array_merge($this->providerConfig, $array);
-    }
-
-
-    /**
      * Dynamic registration
      * @param ServerRequestInterface $request
      * @param string[] $redirectUris
      * @throws OpenIDConnectClientException
      */
-    public function register(array $redirectUris) {
+    public function register($clientName, array $redirectUris) {
 
-        $registration_endpoint = $this->getProviderConfigValue('registration_endpoint');
+        $registration_endpoint = $this-> configuration -> getProviderConfigValue('registration_endpoint');
 
         $send_object = (object)array(
             'redirect_uris' => $redirectUris,
-            'client_name' => $this->getClientName()
+            'client_name' => $clientName
         );
 
-        $response = $this->fetchURL($registration_endpoint, json_encode($send_object));
-
-        $json_response = json_decode($response);
+        $response = $this -> httpClient -> sendJsonViaPost($registration_endpoint, json_encode($send_object));
+        $body = $response -> getBody();
+        $jsonObject = json_decode($body);
+        if(null === $jsonObject){
+            throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
+        }
 
         // Throw some errors if we encounter them
-        if ($json_response === false) {
+        if ($jsonObject === false) {
             throw new OpenIDConnectClientException("Error registering: JSON response received from the server was invalid.");
-        } elseif (isset($json_response->{'error_description'})) {
-            throw new OpenIDConnectClientException($json_response->{'error_description'});
+        } elseif (isset($jsonObject->{'error_description'})) {
+            throw new OpenIDConnectClientException($jsonObject->{'error_description'});
         }
 
         // The OpenID Connect Dynamic registration protocol makes the client secret optional
         // and provides a registration access token and URI endpoint if it is not present
-        if (!isset($json_response->{'client_secret'})) {
+        if (!isset($jsonObject->{'client_secret'})) {
             throw new OpenIDConnectClientException("Error registering:
                                                     Please contact the OpenID Connect provider and obtain a Client ID and Secret directly from them");
         }
         $configuration = new ProviderArray(
             $this -> configuration -> getProviderUrl(),
-            $json_response->{'client_id'},
-            $json_response->{'client_secret'}
+            $jsonObject->{'client_id'},
+            $jsonObject->{'client_secret'}
 
         );
         return $configuration;
 
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getClientName() {
-        return $this->clientName;
-    }
-
-    /**
-     * @param $clientName
-     */
-    public function setClientName($clientName) {
-        $this->clientName = $clientName;
     }
 
     /**
@@ -1019,31 +812,6 @@ class OpenIDConnectClient
      */
     protected function unsetState() {
         $this -> sessionStorage -> unsetByKey('openid_connect_state');
-    }
-
-    /**
-     * Get the response code from last action request.
-     *
-     * @return int
-     */
-    public function getResponseCode()
-    {
-        return $this->responseCode;
-    }
-
-    /**
-     * Set timeout (seconds)
-     *
-     * @param int $timeout
-     */
-    public function setTimeout($timeout)
-    {
-        $this->timeOut = $timeout;
-    }
-
-    public function getTimeout()
-    {
-        return $this->timeOut;
     }
 	
     /**

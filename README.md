@@ -69,7 +69,7 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
     $_COOKIE,
     $_FILES
 );
-$sessionStorage = new \Athanasius\PHPSessionBridge();
+$sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 $redirectUrls = [\Athanasius\Utilities::getCurrentUri($request)];//or take your own uri
 $guzzleClient = new GuzzleHttp\Client();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
@@ -104,7 +104,7 @@ $oidc->setCertPath("/path/to/my.cert");
 ```php
 use Athanasius\OpenIDConnectClient;
 
-$sessionStorage = new \Athanasius\PHPSessionBridge();
+$sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 
 $guzzleClient = new GuzzleHttp\Client();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
@@ -133,7 +133,7 @@ $clientCredentialsToken = $oidc->requestClientCredentialsToken()->access_token;
 ```php
 use Athanasius\OpenIDConnectClient;
 
-$sessionStorage = new \Athanasius\PHPSessionBridge();
+$sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 
 $guzzleClient = new GuzzleHttp\Client();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(

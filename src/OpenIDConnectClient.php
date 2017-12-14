@@ -26,6 +26,7 @@ namespace Athanasius;
 
 use Athanasius\Configuration\ProviderArray;
 use Athanasius\Configuration\ProviderInterface;
+use Athanasius\Session\SessionInterface;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use Athanasius\Exception\OpenIDConnectClientException;

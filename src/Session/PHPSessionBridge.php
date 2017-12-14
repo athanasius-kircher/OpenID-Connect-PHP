@@ -6,7 +6,7 @@
  * Time: 22:57
  */
 
-namespace Athanasius;
+namespace Athanasius\Session;
 
 /**
  * Class PHPSessionBridge simple session implementation

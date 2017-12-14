@@ -6,7 +6,7 @@
  * Time: 22:37
  */
 
-namespace Athanasius;
+namespace Athanasius\Session;
 
 /**
  * Interface SessionInterface

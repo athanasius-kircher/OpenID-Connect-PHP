@@ -12,7 +12,7 @@ namespace Athanasius\Session;
  * Class PHPSessionBridge simple session implementation
  * @package Athanasius
  */
-class PHPSessionBridge implements SessionInterface
+final class PHPSessionBridge implements SessionInterface
 {
     public function get($key, $default = null)
     {

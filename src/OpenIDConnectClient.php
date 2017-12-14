@@ -41,7 +41,7 @@ use Psr\Http\Message\ServerRequestInterface;
  * @todo add Unit Tests
  * @todo overwork examples
  */
-class OpenIDConnectClient
+final class OpenIDConnectClient
 {
     /**
      * @var string if we aquire an access token it will be stored here
@@ -81,15 +81,15 @@ class OpenIDConnectClient
     /**
      * @var SessionInterface
      */
-    protected $sessionStorage;
+    private $sessionStorage;
     /**
      * @var ClientInterface
      */
-    protected $httpClient;
+    private $httpClient;
     /**
      * @var ProviderInterface
      */
-    protected $configuration;
+    private $configuration;
 
     /**
      * OpenIDConnectClient constructor.

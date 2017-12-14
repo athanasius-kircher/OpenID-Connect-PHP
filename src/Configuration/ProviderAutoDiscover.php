@@ -11,7 +11,7 @@ namespace Athanasius\Configuration;
 use Athanasius\Exception\ConfigurationException;
 use Athanasius\HttpClient\ClientInterface;
 
-class ProviderAutoDiscover extends ProviderArray
+final class ProviderAutoDiscover extends ProviderArray
 {
     /**
      * @var ClientInterface

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 * Add support for HS256, HS512 and HS384 signatures
 * Removed unused calls to $this->getProviderConfigValue("token_endpoint_…
 * PSR 7 usage instead of hard coded PHP superglobals
+* totally changed api and restructure lib
 
 ### Changed
 

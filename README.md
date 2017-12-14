@@ -34,7 +34,7 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 
 
 $redirectUrl = \Athanasius\Utilities::getCurrentUri($request);//or take your own uri
-$sessionStorage = new \Athanasius\PHPSessionBridge();
+$sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 
 $guzzleClient = new GuzzleHttp\Client();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(

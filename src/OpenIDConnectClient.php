@@ -30,6 +30,9 @@ use Athanasius\Exception\InvalidReponseType;
 use Athanasius\HttpClient\ClientInterface;
 use Athanasius\Session\SessionInterface;
 use Athanasius\Exception\OpenIDConnectClientException;
+use Athanasius\Token\AccessToken;
+use Athanasius\Token\IdToken;
+use Athanasius\Token\RefreshToken;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
@@ -44,24 +47,19 @@ use Psr\Http\Message\ServerRequestInterface;
 final class OpenIDConnectClient
 {
     /**
-     * @var string if we aquire an access token it will be stored here
+     * @var AccessToken
      */
     private $accessToken;
 
     /**
-     * @var string if we aquire a refresh token it will be stored here
+     * @var RefreshToken
      */
     private $refreshToken;
 
     /**
-     * @var string if we acquire an id token it will be stored here
+     * @var IdToken
      */
     private $idToken;
-
-    /**
-     * @var string stores the token response
-     */
-    private $tokenResponse;
 
     /**
      * @var array holds scopes
@@ -152,26 +150,19 @@ final class OpenIDConnectClient
 
             $claims = $this->decodeJWT($token_json->id_token, 1);
 
-            // Verify the signature
-            if ($this->canVerifySignatures()) {
 		        if (!$this-> configuration -> getProviderConfigValue('jwks_uri')) {
                     throw new OpenIDConnectClientException ("Unable to verify signature due to no jwks_uri being defined");
                 }
                 if (!$this->verifyJWTsignature($token_json->id_token)) {
                     throw new OpenIDConnectClientException ("Unable to verify signature");
                 }
-            } else {
-                user_error("Warning: JWT signature verification unavailable.");
-            }
+
 
             // If this is a valid claim
             if ($this->verifyJWTclaims($claims, $token_json->access_token)) {
 
                 // Clean up the session a little
                 $this->unsetNonce();
-
-		        // Save the full response
-                $this->tokenResponse = $token_json;
 
                 // Save the id token
                 $this->idToken = $token_json->id_token;
@@ -378,7 +369,7 @@ final class OpenIDConnectClient
      * Requests Access token with refresh token
      *
      * @param $code
-     * @return mixed
+     * @return RefreshToken
      */
     public function refreshToken($refresh_token) {
         $token_endpoint = $this-> configuration -> getProviderConfigValue("token_endpoint");
@@ -398,8 +389,8 @@ final class OpenIDConnectClient
         if(null === $jsonObject){
             throw new InvalidReponseType('Json could not be converted from response [%s]',$body);
         }
-        $this->refreshToken = $jsonObject->refresh_token;
-        return $jsonObject;
+        $this->refreshToken = new RefreshToken($jsonObject->refresh_token);
+        return $this->refreshToken;
     }
 
     /**
@@ -563,17 +554,6 @@ final class OpenIDConnectClient
     }
 
     /**
-     * @param $jwt string encoded JWT
-     * @param int $section the section we would like to decode
-     * @return object
-     */
-    private function decodeJWT($jwt, $section = 0) {
-
-        $parts = explode(".", $jwt);
-        return json_decode(Utilities::base64urlDecode($parts[$section]));
-    }
-
-    /**
      *
      * @param $attribute string optional
      *
@@ -679,81 +659,6 @@ final class OpenIDConnectClient
         );
         return $configuration;
 
-    }
-
-    /**
-     * @return bool
-     */
-    public function canVerifySignatures() {
-      return class_exists('\phpseclib\Crypt\RSA') || class_exists('Crypt_RSA');
-    }
-
-    /**
-     * Set the access token.
-     *
-     * May be required for subclasses of this Client.
-     *
-     * @param mixed $accessToken
-     *
-     * @return void
-     */
-    public function setAccessToken($accessToken) {
-        $this->accessToken = $accessToken;
-    }
-
-    /**
-     * @return string
-     */
-    public function getAccessToken() {
-        return $this->accessToken;
-    }
-
-    /**
-     * @return string
-     */
-    public function getRefreshToken() {
-        return $this->refreshToken;
-    }
-
-    /**
-     * @return string
-     */
-    public function getIdToken() {
-        return $this->idToken;
-    }
-
-    /**
-     * @return array
-     */
-    public function getAccessTokenHeader() {
-        return $this->decodeJWT($this->accessToken, 0);
-    }
-
-    /**
-     * @return array
-     */
-    public function getAccessTokenPayload() {
-        return $this->decodeJWT($this->accessToken, 1);
-    }
-
-    /**
-     * @return array
-     */
-    public function getIdTokenHeader() {
-        return $this->decodeJWT($this->idToken, 0);
-    }
-
-    /**
-     * @return array
-     */
-    public function getIdTokenPayload() {
-        return $this->decodeJWT($this->idToken, 1);
-    }
-    /**
-     * @return array
-     */
-    public function getTokenResponse() {
-        return $this->tokenResponse;
     }
 
     /**

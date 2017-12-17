@@ -69,8 +69,7 @@ class JWTVerification
             if(isset($accessToken -> getHeader() -> alg) && $accessToken -> getHeader() -> alg != 'none'){
                 $bit = substr($accessToken -> getHeader() -> alg, 2, 3);
             }else{
-                // TODO: Error case. throw exception???
-                $bit = '256';
+                throw new VerificationException('Unsecure JWS are not support.');
             }
             $len = ((int)$bit)/16;
             $expecte_at_hash = $this->urlEncode(substr(hash('sha'.$bit, $accessToken -> getTokenString(), true), 0, $len));

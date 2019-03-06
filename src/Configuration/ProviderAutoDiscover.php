@@ -81,7 +81,7 @@ final class ProviderAutoDiscover extends ProviderArray
             $body = $response -> getBody();
             $jwks = json_decode($body);
             if(null === $jwks){
-                throw new ConfigurationException('Json could not be converted from response [%s]',$body);
+                throw new ConfigurationException(sprintf('Json could not be converted from response [%s]',$body));
             }
             return new JWK($body);
         }

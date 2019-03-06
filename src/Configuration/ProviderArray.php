@@ -97,10 +97,10 @@ class ProviderArray implements ProviderInterface
      * @return JWK
      */
     public function getJWK(){
-        $jwkJsonString = $this-> configuration -> getProviderConfigValue('jwks');
+        $jwkJsonString = $this->getProviderConfigValue('jwks');
         $jwks = json_decode($jwkJsonString);
         if(null === $jwks){
-            throw new ConfigurationException('Json could not be converted from response [%s]',$jwkJsonString);
+            throw new ConfigurationException(sprintf('Json could not be converted from response [%s]',$jwkJsonString));
         }
         return new JWK($jwkJsonString);
     }

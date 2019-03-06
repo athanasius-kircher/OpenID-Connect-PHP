@@ -43,9 +43,10 @@ use Psr\Log\LogLevel;
 /**
  * Class OpenIDConnectClient
  * @package Athanasius
+ * @todo split different flows into different classes
  * @todo add Unit Tests
  * @todo overwork examples
- * @todo support third party login
+ * @todo support third party login flow
  * @todo allow additional claims
  */
 final class OpenIDConnectClient

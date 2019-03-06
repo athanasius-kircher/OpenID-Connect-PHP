@@ -9,7 +9,6 @@
 namespace Athanasius\Configuration;
 
 use Athanasius\Exception\ConfigurationException;
-use Athanasius\Exception\InvalidReponseType;
 use Athanasius\HttpClient\ClientInterface;
 use Athanasius\Verification\JWK;
 
@@ -43,12 +42,17 @@ final class ProviderAutoDiscover extends ProviderArray
      * @param null $default
      * @return mixed|null
      * @throws ConfigurationException
+     * @throws \Athanasius\Exception\ConnectionException
      */
     public function getProviderConfigValue($param, $default = null) {
         try{
             $config = parent::getProviderConfigValue($param,$default);
             return $config;
         }catch(ConfigurationException $e){
+            // we can not get jwks directly from the wellknown
+            if ('jwks' === $param) {
+                return $default;
+            }
             if(!$this->wellKnown){
                 $wellKnownUrl  = rtrim($this -> getProviderUrl(),"/") . "/.well-known/openid-configuration";
                 $response = $this -> httpClient -> sendGet($wellKnownUrl);

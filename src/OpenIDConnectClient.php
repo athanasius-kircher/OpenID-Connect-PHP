@@ -43,7 +43,6 @@ use Psr\Log\LogLevel;
 /**
  * Class OpenIDConnectClient
  * @package Athanasius
- * @todo implement clean OpenID Spec methods and no aggregation as in authenticate
  * @todo add Unit Tests
  * @todo overwork examples
  * @todo support third party login
@@ -131,81 +130,80 @@ final class OpenIDConnectClient
      * @return bool
      * @throws OpenIDConnectClientException
      */
-    public function authenticate(ServerRequestInterface $request, $redirectUri) {
+    public function getTokenByCode(ServerRequestInterface $request, $redirectUri) {
 
         // Do a preemptive check to see if the provider has thrown an error from a previous redirect
         if ($error = Utilities::getParameterFromRequest($request,'error',false)) {
             $desc = Utilities::getParameterFromRequest($request,'error_description','');
             $desc = $desc !== '' ? " Description: " . $desc : "";
+            $this -> log(LogLevel::DEBUG, 'Error in code response: ',['error'=>$error,'error_description'=>$desc]);
             throw new OpenIDConnectClientException("Error: " . $error .$desc);
         }
-
-        // If we have an authorization code then proceed to request a token
-        if ($code = Utilities::getParameterFromRequest($request,'code',false)) {
-
-            $token_json = $this->requestTokens($code, $redirectUri);
-
-            // Throw an error if the server returns one
-            if (isset($token_json->error)) {
-                if (isset($token_json->error_description)) {
-                    throw new OpenIDConnectClientException($token_json->error_description);
-                }
-                throw new OpenIDConnectClientException('Got response: ' . $token_json->error);
-            }
-
-            // Do an OpenID Connect session check
-            if (Utilities::getParameterFromRequest($request,'state',false) !== $this->getState()) {
-                throw new OpenIDConnectClientException("Unable to determine state");
-            }
-
-			// Cleanup state
-			$this->unsetState();
-
-            if (!property_exists($token_json, 'id_token')) {
-                throw new InvalidReponseType("User did not authorize openid scope.");
-            }
-            $verification = new JWTVerification();
-            $jwk = $this -> configuration -> getJWK();
-            $idToken = new IdToken($token_json -> id_token);
-            $accessToken = null;
-            if($token_json -> access_token){
-                $accessToken = new AccessToken($token_json -> access_token);
-            }
-            try{
-                if (!$verification -> verifyJWTsignature($idToken,$jwk,$this -> configuration)) {
-                    $this -> log(LogLevel::DEBUG, 'Unable to verify signature',['configuration'=>$this -> configuration,'idToken'=>$idToken,'jwk'=>$jwk]);
-                    throw new VerificationException("Unable to verify signature");
-                }
-
-                // If this is a valid claim
-                if (!$verification->verifyJWTclaims($idToken,$this -> configuration,$this -> getNonce(), $accessToken)) {
-                    $this -> log(LogLevel::DEBUG, 'Unable to verify JWT claims',['configuration'=>$this -> configuration,'idToken'=>$idToken,'accessToken'=>$accessToken]);
-                    throw new VerificationException("Unable to verify JWT claims");
-                }
-            }catch(VerificationException $exception){
-                $this -> log(LogLevel::DEBUG, 'Unable to verify JWT claims',['configuration'=>$this -> configuration,'idToken'=>$idToken,'accessToken'=>$accessToken,'jwk'=>$jwk]);
-                throw new VerificationException("Unable to verify JWT claims",0,$exception);
-            }
-
-            // Clean up the session a little
-            $this->unsetNonce();
-
-            // Save the id token
-            $this->idToken = $idToken;
-
-            // Save the access token
-            $this->accessToken = $accessToken;
-
-            // Save the refresh token, if we got one
-            if (isset($token_json->refresh_token)){
-                $this->refreshToken = new RefreshToken($token_json->refresh_token);
-            }
-            // Success!
-            return true;
-        } else {
-            $this->requestAuthorization($redirectUri);
-            return false;
+        $code = Utilities::getParameterFromRequest($request,'code',false);
+        if (false === $code) {
+            $this -> log(LogLevel::DEBUG, 'No code found in request. Can not get access token without.',['request_data'=>$request->getQueryParams()]);
+            throw new OpenIDConnectClientException("No code found in request. Can not get access token without.");
         }
+
+        $token_json = $this->requestTokens($code, $redirectUri);
+
+        // Throw an error if the server returns one
+        if (isset($token_json->error)) {
+            if (isset($token_json->error_description)) {
+                throw new OpenIDConnectClientException($token_json->error_description);
+            }
+            throw new OpenIDConnectClientException('Got response: ' . $token_json->error);
+        }
+
+        // Do an OpenID Connect session check
+        if (Utilities::getParameterFromRequest($request,'state',false) !== $this->getState()) {
+            throw new OpenIDConnectClientException("Unable to determine state");
+        }
+
+        // Cleanup state
+        $this->unsetState();
+
+        if (!property_exists($token_json, 'id_token')) {
+            throw new InvalidReponseType("User did not authorize openid scope.");
+        }
+        $verification = new JWTVerification();
+        $jwk = $this -> configuration -> getJWK();
+        $idToken = new IdToken($token_json -> id_token);
+        $accessToken = null;
+        if($token_json -> access_token){
+            $accessToken = new AccessToken($token_json -> access_token);
+        }
+        try{
+            if (!$verification -> verifyJWTsignature($idToken,$jwk,$this -> configuration)) {
+                $this -> log(LogLevel::DEBUG, 'Unable to verify signature',['configuration'=>$this -> configuration,'idToken'=>$idToken,'jwk'=>$jwk]);
+                throw new VerificationException("Unable to verify signature");
+            }
+
+            // If this is a valid claim
+            if (!$verification->verifyJWTclaims($idToken,$this -> configuration,$this -> getNonce(), $accessToken)) {
+                $this -> log(LogLevel::DEBUG, 'Unable to verify JWT claims',['configuration'=>$this -> configuration,'idToken'=>$idToken,'accessToken'=>$accessToken]);
+                throw new VerificationException("Unable to verify JWT claims");
+            }
+        }catch(VerificationException $exception){
+            $this -> log(LogLevel::DEBUG, 'Unable to verify JWT claims',['configuration'=>$this -> configuration,'idToken'=>$idToken,'accessToken'=>$accessToken,'jwk'=>$jwk]);
+            throw new VerificationException("Unable to verify JWT claims",0,$exception);
+        }
+
+        // Clean up the session a little
+        $this->unsetNonce();
+
+        // Save the id token
+        $this->idToken = $idToken;
+
+        // Save the access token
+        $this->accessToken = $accessToken;
+
+        // Save the refresh token, if we got one
+        if (isset($token_json->refresh_token)){
+            $this->refreshToken = new RefreshToken($token_json->refresh_token);
+        }
+        // Success!
+        return true;
 
     }
 
@@ -247,9 +245,9 @@ final class OpenIDConnectClient
     /**
      * @param string $redirectUri
      * @param array $authParams
-     * @todo check why authParams is needed here
+     * @return string
      */
-    private function requestAuthorization($redirectUri,array $authParams = array()) {
+    public function requestRedirectUrlForAuthorization($redirectUri,array $authParams = array()) {
 
         $auth_endpoint = $this-> configuration -> getProviderConfigValue("authorization_endpoint");
         $response_type = "code";
@@ -282,7 +280,7 @@ final class OpenIDConnectClient
 
         $auth_endpoint .= (strpos($auth_endpoint, '?') === false ? '?' : '&') . http_build_query($auth_params, null, '&');
 
-        $this->redirect($auth_endpoint);
+        return $auth_endpoint;
     }
 
     /**
@@ -467,14 +465,6 @@ final class OpenIDConnectClient
         } else {
             return null;
         }
-    }
-
-    /**
-     * @param $url
-     */
-    private function redirect($url) {
-        header('Location: ' . $url);
-        exit;
     }
 
     /**

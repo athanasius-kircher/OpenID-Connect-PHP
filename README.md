@@ -51,8 +51,20 @@ $oidc = new OpenIDConnectClient(
         $guzzleClient
 );
 $oidc->setCertPath('/path/to/my.cert');
-$oidc->authenticate($request,$redirectUrl);
-$name = $oidc->requestUserInfo('given_name');
+
+$error = Utilities::getParameterFromRequest($request,'error',false);
+$code = Utilities::getParameterFromRequest($request,'code',false)
+
+// if you handle the callback in a different script you do not have to case here
+if (false !== $error OR false !== $code) {
+    $oidc->getTokenByCode($request,$redirectUrl);
+    $name = $oidc->requestUserInfo('given_name');
+} else {
+    $authenticationUrl = $oidc->requestRedirectUrlForAuthorization($redirectUrl);
+    header('Location:' . $authenticationUrl);
+    exit;
+}
+
 
 ```
 

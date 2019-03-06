@@ -60,7 +60,9 @@ if (false !== $error OR false !== $code) {
     $oidc->getTokenByCode($request,$redirectUrl);
     $name = $oidc->requestUserInfo('given_name');
 } else {
-    $oidc->requestAuthorization($redirectUrl);
+    $authenticationUrl = $oidc->requestRedirectUrlForAuthorization($redirectUrl);
+    header('Location:' . $authenticationUrl);
+    exit;
 }
 
 

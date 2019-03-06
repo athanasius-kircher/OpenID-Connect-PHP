@@ -245,8 +245,9 @@ final class OpenIDConnectClient
     /**
      * @param string $redirectUri
      * @param array $authParams
+     * @return string
      */
-    public function requestAuthorization($redirectUri,array $authParams = array()) {
+    public function requestRedirectUrlForAuthorization($redirectUri,array $authParams = array()) {
 
         $auth_endpoint = $this-> configuration -> getProviderConfigValue("authorization_endpoint");
         $response_type = "code";
@@ -279,7 +280,7 @@ final class OpenIDConnectClient
 
         $auth_endpoint .= (strpos($auth_endpoint, '?') === false ? '?' : '&') . http_build_query($auth_params, null, '&');
 
-        $this->redirect($auth_endpoint);
+        return $auth_endpoint;
     }
 
     /**
@@ -464,14 +465,6 @@ final class OpenIDConnectClient
         } else {
             return null;
         }
-    }
-
-    /**
-     * @param $url
-     */
-    private function redirect($url) {
-        header('Location: ' . $url);
-        exit;
     }
 
     /**

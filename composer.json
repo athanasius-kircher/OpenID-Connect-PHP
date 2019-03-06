@@ -16,10 +16,12 @@
     },
     "autoload" : {
         "psr-4": {
-            "Athanasius\\": "src/"
+            "Athanasius\\": "src/",
+            "AthanasiusTests\\": "tests/"
         }
     },
     "require-dev": {
-        "zendframework/zend-diactoros": "^1.6"
+        "zendframework/zend-diactoros": "^1.6",
+        "phpunit/phpunit": "^7.5"
     }
 }

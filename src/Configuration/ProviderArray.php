@@ -41,6 +41,9 @@ class ProviderArray implements ProviderInterface
      */
     public function __construct($providerUrl, $clientId = '', $clientSecret = '', array $configuration = [])
     {
+        if (!filter_var($providerUrl, FILTER_VALIDATE_URL)) {
+            throw new ConfigurationException('Provider url does not seem to be a valid uri.');
+        }
         $this->providerUrl = $providerUrl;
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;

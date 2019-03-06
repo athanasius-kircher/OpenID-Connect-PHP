@@ -36,9 +36,9 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 $redirectUrl = \Athanasius\Utilities::getCurrentUri($request);//or take your own uri
 $sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 
-$guzzleClient = new GuzzleHttp\Client();
+$guzzleClientAdapter = new Athanasius\HttpClient\GuzzleClient();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
-    $guzzleClient,
+    $guzzleClientAdapter,
     'http://myproviderURL.com/',
     'ClientIDHere',
     'ClientSecretHere'
@@ -48,7 +48,7 @@ $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
 $oidc = new OpenIDConnectClient(
         $configuration,
         $sessionStorage,
-        $guzzleClient
+        $guzzleClientAdapter
 );
 $oidc->setCertPath('/path/to/my.cert');
 
@@ -83,16 +83,16 @@ $request = \Zend\Diactoros\ServerRequestFactory::fromGlobals(
 );
 $sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 $redirectUrls = [\Athanasius\Utilities::getCurrentUri($request)];//or take your own uri
-$guzzleClient = new GuzzleHttp\Client();
+$guzzleClientAdapter = new Athanasius\HttpClient\GuzzleClient();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
-    $guzzleClient,
+    $guzzleClientAdapter,
     'http://myproviderURL.com/'
 );
 
 $oidc = new OpenIDConnectClient(
         $configuration,
         $sessionStorage,
-        $guzzleClient
+        $guzzleClientAdapter
 );
 
 $oidc->register($request,$redirectUrls);
@@ -118,9 +118,9 @@ use Athanasius\OpenIDConnectClient;
 
 $sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 
-$guzzleClient = new GuzzleHttp\Client();
+$guzzleClientAdapter = new Athanasius\HttpClient\GuzzleClient();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
-    $guzzleClient,
+    $guzzleClientAdapter,
     'http://myproviderURL.com/',
     'ClientIDHere',
     'ClientSecretHere'
@@ -130,7 +130,7 @@ $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
 $oidc = new OpenIDConnectClient(
         $configuration,
         $sessionStorage,
-        $guzzleClient
+        $guzzleClientAdapter
 );
 $oidc->providerConfigParam(array('token_endpoint'=>'https://id.provider.com/connect/token'));
 $oidc->addScope('my_scope');
@@ -147,9 +147,9 @@ use Athanasius\OpenIDConnectClient;
 
 $sessionStorage = new \Athanasius\Session\PHPSessionBridge();
 
-$guzzleClient = new GuzzleHttp\Client();
+$guzzleClientAdapter = new Athanasius\HttpClient\GuzzleClient();
 $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
-    $guzzleClient,
+    $guzzleClientAdapter,
     'http://myproviderURL.com/',
     'ClientIDHere',
     'ClientSecretHere'
@@ -159,7 +159,7 @@ $configuration = new \Athanasius\Configuration\ProviderAutoDiscover(
 $oidc = new OpenIDConnectClient(
         $configuration,
         $sessionStorage,
-        $guzzleClient
+        $guzzleClientAdapter
 );
 $oidc->providerConfigParam(array('token_endpoint'=>'https://id.provider.com/connect/token'));
 $oidc->addScope('my_scope');
